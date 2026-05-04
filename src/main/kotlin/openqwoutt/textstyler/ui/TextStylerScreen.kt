@@ -98,13 +98,6 @@ fun TextStylerScreen(
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
-    // Handle close behavior - when result is ready, trigger the callback
-    state.result?.let { resultText ->
-        state.onResultReady?.let { callback ->
-            // The callback is triggered in the ViewModel when result is set
-        }
-    }
-
     // Settings modal with crossfade animation
     Crossfade(
         targetState = state.showSettings,
