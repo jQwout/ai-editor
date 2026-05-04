@@ -200,7 +200,7 @@ private enum class StyleMode(
 ) {
     TRANSLATE(
         id = "translate",
-        prompt = "Translate the text into natural English unless it is already English; if it is English, translate it into natural Russian. Preserve the original meaning. Respond in the same language as the input text. Return only the translated text."
+        prompt = "Translate the text into natural English unless it is already English; if it is English, translate it into natural Russian. Preserve the original meaning. Return only the translated text."
     ),
     STYLE(
         id = "style",
@@ -256,7 +256,7 @@ private enum class StyleMode(
     ),
     SCREENSHOT(
         id = "screenshot_analysis",
-        prompt = "Act as a screen-aware assistant. The user may paste OCR text or a description from a screenshot. Explain what is visible, what matters, and what action to take next."
+        prompt = "Act as a screen-aware assistant. The user may paste OCR text or a description from a screenshot. Explain what is visible, what matters, and what action to take next. IMPORTANT: Always respond in the SAME language as the user's input text."
     );
 
     companion object {

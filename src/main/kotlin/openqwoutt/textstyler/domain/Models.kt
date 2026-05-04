@@ -114,6 +114,22 @@ enum class StyleMode(
         icon = "=",
         group = ModeGroup.ANALYZE,
         prompt = "Create a clear, concise summary of the text. Capture all key information. Use bullets if that helps clarity. Respond in the same language as the input text. Return only the summary."
+    ),
+    TRANSLATE(
+        id = "translate",
+        displayName = "Translate",
+        shortName = "Translate",
+        icon = "T",
+        group = ModeGroup.MAIN,
+        prompt = "Translate the text into natural English unless it is already English; if it is English, translate it into natural Russian. Preserve the original meaning. Return only the translated text."
+    ),
+    SCREENSHOT(
+        id = "screenshot_analysis",
+        displayName = "Screenshot",
+        shortName = "Screenshot",
+        icon = "[",
+        group = ModeGroup.ANALYZE,
+        prompt = "Act as a screen-aware assistant. The user may paste OCR text or a description from a screenshot. Explain what is visible, what matters, and what action to take next. IMPORTANT: Always respond in the SAME language as the user's input text."
     )
 }
 
