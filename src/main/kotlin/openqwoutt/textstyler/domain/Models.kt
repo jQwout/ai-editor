@@ -1,9 +1,12 @@
 package openqwoutt.miniapp.textstyler.domain
 
 enum class ModeGroup {
-    MAIN,
+    /** Summary + deep analyze only */
+    ANALYSIS,
+    /** Base rewrite + tone presets */
     STYLE,
-    ANALYZE
+    /** Grammar / clarity fix */
+    FIX
 }
 
 enum class StyleMode(
@@ -15,12 +18,20 @@ enum class StyleMode(
     val prompt: String,
     val temperature: Double = 0.4
 ) {
-    ANALYZE_MAIN(
+    SUMMARIZE(
+        id = "summarize",
+        displayName = "Summarize",
+        shortName = "Summary",
+        icon = "=",
+        group = ModeGroup.ANALYSIS,
+        prompt = "Create a clear, concise summary of the text. Capture all key information. Use bullets if that helps clarity. Respond in the same language as the input text. Return only the summary."
+    ),
+    ANALYZE(
         id = "analyze",
         displayName = "Analyze",
         shortName = "Analyze",
         icon = "?",
-        group = ModeGroup.MAIN,
+        group = ModeGroup.ANALYSIS,
         prompt = "Analyze the text for: main intent and purpose, tone and emotional register, key points (3-5 bullets max), weak spots and potential issues, suggested improvements. Respond in the same language as the input text. Keep the response concise and actionable."
     ),
     STYLE(
@@ -28,7 +39,7 @@ enum class StyleMode(
         displayName = "Clean style",
         shortName = "Style",
         icon = "*",
-        group = ModeGroup.MAIN,
+        group = ModeGroup.STYLE,
         prompt = "Rewrite the text to sound polished, clear, and modern. Preserve the original meaning. Respond in the same language as the input text. Return only the rewritten text."
     ),
     FIX(
@@ -36,7 +47,7 @@ enum class StyleMode(
         displayName = "Fix grammar",
         shortName = "Fix",
         icon = "o",
-        group = ModeGroup.MAIN,
+        group = ModeGroup.FIX,
         prompt = "Fix all spelling, grammar, punctuation, and clarity errors. Preserve the original meaning. Respond in the same language as the input text. Return only the corrected text without explanations."
     ),
     FORMAL(
@@ -106,30 +117,6 @@ enum class StyleMode(
         group = ModeGroup.STYLE,
         prompt = "Add fitting old-school emoticons like :-) :-/ :-D T_T ^_^ to convey emotion. Do NOT change the words or add new text. Respond in the same language as the input text. Return only the modified text.",
         temperature = 0.6
-    ),
-    SUMMARIZE(
-        id = "summarize",
-        displayName = "Summarize",
-        shortName = "Summary",
-        icon = "=",
-        group = ModeGroup.ANALYZE,
-        prompt = "Create a clear, concise summary of the text. Capture all key information. Use bullets if that helps clarity. Respond in the same language as the input text. Return only the summary."
-    ),
-    TRANSLATE(
-        id = "translate",
-        displayName = "Translate",
-        shortName = "Translate",
-        icon = "T",
-        group = ModeGroup.MAIN,
-        prompt = "Translate the text into natural English unless it is already English; if it is English, translate it into natural Russian. Preserve the original meaning. Return only the translated text."
-    ),
-    SCREENSHOT(
-        id = "screenshot_analysis",
-        displayName = "Screenshot",
-        shortName = "Screenshot",
-        icon = "[",
-        group = ModeGroup.ANALYZE,
-        prompt = "Act as a screen-aware assistant. The user may paste OCR text or a description from a screenshot. Explain what is visible, what matters, and what action to take next. IMPORTANT: Always respond in the SAME language as the user's input text."
     )
 }
 

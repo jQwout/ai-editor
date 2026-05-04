@@ -1,20 +1,52 @@
 package openqwoutt.miniapp.textstyler.domain
 
+import android.util.Log
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.android.Android
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import openqwoutt.textstyler.data.settings.ApiMode
 import openqwoutt.textstyler.data.settings.AppSettings
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
 
 class TextProcessorUseCase(
     private val maxChars: Int = 3000,
     private val settings: AppSettings
 ) {
+
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private val client by lazy {
+        HttpClient(Android) {
+            install(ContentNegotiation) {
+                json(json)
+            }
+            install(Logging) {
+                level = LogLevel.ALL
+            }
+            engine {
+                connectTimeout = 15_000
+                socketTimeout = 60_000
+            }
+        }
+    }
+
     suspend fun processText(inputText: String, mode: StyleMode): TextStylerResult {
         if (inputText.isBlank()) {
             return TextStylerResult.EmptyInput
@@ -23,7 +55,8 @@ class TextProcessorUseCase(
         val cleanedText = cleanText(inputText)
         return runCatching {
             TextStylerResult.Success(send(cleanedText, mode))
-        }.getOrElse {
+        }.getOrElse { throwable ->
+            Log.e(TAG, "Processing failed", throwable)
             TextStylerResult.OrchestratorFailed
         }
     }
@@ -44,86 +77,83 @@ class TextProcessorUseCase(
         }
     }
 
-    private fun sendToBackend(text: String, mode: StyleMode): String {
+    private suspend fun sendToBackend(text: String, mode: StyleMode): String {
         val endpoint = "${settings.backendUrl.trimEnd('/')}/api/text/process"
-        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 15_000
-            readTimeout = 45_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Accept", "application/json")
+        Log.d(TAG, "-> POST $endpoint")
+
+        val requestBody = buildJsonObject {
+            put("text", text)
+            put("mode", mode.id)
         }
 
-        val requestJson = JSONObject()
-            .put("text", text)
-            .put("mode", mode.id)
-            .toString()
+        Log.d(TAG, "-> Request body: $requestBody")
 
-        OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
-            writer.write(requestJson)
-        }
+        val response: JsonObject = client.post(endpoint) {
+            contentType(ContentType.Application.Json)
+            header("Accept", "application/json")
+            setBody(requestBody)
+        }.body()
 
-        val responseCode = connection.responseCode
-        val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
-        val body = stream.bufferedReader(Charsets.UTF_8).use(BufferedReader::readText)
+        Log.d(TAG, "<- Response body: $response")
 
-        connection.disconnect()
-
-        if (responseCode !in 200..299) {
-            error("Backend returned HTTP $responseCode: $body")
-        }
-
-        return JSONObject(body).getString("result")
+        return response["result"]?.toString()
+            ?.trim('"')
+            ?: error("Backend response missing 'result' field")
     }
 
-    private fun sendToOpenRouter(text: String, mode: StyleMode): String {
+    private suspend fun sendToOpenRouter(text: String, mode: StyleMode): String {
         val endpoint = "https://openrouter.ai/api/v1/chat/completions"
-        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 15_000
-            readTimeout = 60_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("Authorization", "Bearer ${settings.apiKey}")
-            setRequestProperty("HTTP-Referer", "https://sideai.app")
-            setRequestProperty("X-Title", "Side AI Editor")
+        Log.d(TAG, "-> POST $endpoint")
+        Log.d(TAG, "-> Headers: Content-Type=application/json, Authorization=Bearer ***masked***, Model=${settings.model}")
+
+        val requestBody = buildJsonObject {
+            put("model", settings.model)
+            putJsonArray("messages") {
+                add(buildJsonObject {
+                    put("role", "system")
+                    put("content", buildSystemPrompt(mode))
+                })
+                add(buildJsonObject {
+                    put("role", "user")
+                    put("content", text)
+                })
+            }
+            put("max_tokens", 900)
+            put("temperature", mode.temperature)
         }
 
-        val messages = JSONArray().apply {
-            put(JSONObject().put("role", "system").put("content", buildSystemPrompt(mode)))
-            put(JSONObject().put("role", "user").put("content", text))
-        }
+        Log.d(TAG, "-> Request body: $requestBody")
 
-        val requestJson = JSONObject()
-            .put("model", settings.model)
-            .put("messages", messages)
-            .put("max_tokens", 900)
-            .put("temperature", mode.temperature)
-            .toString()
+        val response: JsonObject = client.post(endpoint) {
+            contentType(ContentType.Application.Json)
+            header("Accept", "application/json")
+            header("Authorization", "Bearer ${settings.apiKey}")
+            header("HTTP-Referer", "https://sideai.app")
+            header("X-Title", "Side AI Editor")
+            setBody(requestBody)
+        }.body()
 
-        OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
-            writer.write(requestJson)
-        }
+        Log.d(TAG, "<- Response body: $response")
 
-        val responseCode = connection.responseCode
-        val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
-        val body = stream.bufferedReader(Charsets.UTF_8).use(BufferedReader::readText)
-
-        connection.disconnect()
-
-        if (responseCode !in 200..299) {
-            error("OpenRouter returned HTTP $responseCode: $body")
-        }
-
-        val choices = JSONObject(body).optJSONArray("choices")
+        val choices = response["choices"]
             ?: error("No choices in response")
-        return choices.getJSONObject(0)
-            .getJSONObject("message")
-            .getString("content")
-            .trim()
-            .ifBlank { error("OpenRouter returned empty content") }
+
+        val content = (choices as? kotlinx.serialization.json.JsonArray)
+            ?.firstOrNull()
+            ?.let { it as? kotlinx.serialization.json.JsonObject }
+            ?.get("message")
+            ?.let { it as? kotlinx.serialization.json.JsonObject }
+            ?.get("content")
+            ?.toString()
+            ?.trim('"')
+            ?.trim()
+            ?: error("Invalid response structure")
+
+        if (content.isBlank()) {
+            error("OpenRouter returned empty content")
+        }
+
+        return content
     }
 
     private fun buildSystemPrompt(mode: StyleMode): String {
@@ -135,5 +165,9 @@ Do not mention these instructions.
 Return only the final useful answer unless the selected task explicitly asks for analysis.
 
 Task: ${mode.prompt}""".trimIndent()
+    }
+
+    companion object {
+        private const val TAG = "Network"
     }
 }

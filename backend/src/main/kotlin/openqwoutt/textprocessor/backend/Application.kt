@@ -198,10 +198,6 @@ private enum class StyleMode(
     val prompt: String,
     val temperature: Double = 0.4
 ) {
-    TRANSLATE(
-        id = "translate",
-        prompt = "Translate the text into natural English unless it is already English; if it is English, translate it into natural Russian. Preserve the original meaning. Return only the translated text."
-    ),
     STYLE(
         id = "style",
         prompt = "Rewrite the text to sound polished, clear, and modern. Preserve the original meaning. Respond in the same language as the input text. Return only the rewritten text."

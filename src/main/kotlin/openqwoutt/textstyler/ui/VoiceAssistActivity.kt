@@ -28,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import openqwoutt.miniapp.textstyler.domain.ModeGroup
 import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.domain.TextStylerResult
@@ -144,9 +143,12 @@ fun VoiceAssistScreen(
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
-        StyleMode.entries
-            .filter { it.group == ModeGroup.MAIN || it == StyleMode.SUMMARIZE || it == StyleMode.ANALYZE_MAIN }
-            .forEach { mode ->
+        listOf(
+            StyleMode.ANALYZE,
+            StyleMode.STYLE,
+            StyleMode.FIX,
+            StyleMode.SUMMARIZE
+        ).forEach { mode ->
                 OutlinedButton(
                     onClick = {
                         isProcessing = true

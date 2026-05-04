@@ -4,14 +4,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import openqwoutt.textprocessor.app.SideAppRoot
+import openqwoutt.miniapp.textstyler.TextStylerMiniApp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            SideAppRoot()
+            TextStylerMiniApp(onNavigateBack = { finish() })
         }
     }
 }
