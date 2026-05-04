@@ -10,6 +10,8 @@ import kotlinx.coroutines.launch
 import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.domain.TextStylerResult
+import openqwoutt.textstyler.data.settings.AppSettings
+import openqwoutt.textstyler.data.settings.SettingsRepository
 
 data class TextStylerState(
     val inputText: String = "",
@@ -17,7 +19,9 @@ data class TextStylerState(
     val result: String? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isTextTruncated: Boolean = false
+    val isTextTruncated: Boolean = false,
+    val showSettings: Boolean = false,
+    val settings: AppSettings = AppSettings()
 )
 
 sealed class TextStylerAction {
@@ -26,14 +30,22 @@ sealed class TextStylerAction {
     data object ProcessText : TextStylerAction()
     data object ClearResult : TextStylerAction()
     data object ClearError : TextStylerAction()
+    data object ToggleSettings : TextStylerAction()
+    data class SaveSettings(val settings: AppSettings) : TextStylerAction()
 }
 
 class TextStylerViewModel(
-    private val textProcessorUseCase: TextProcessorUseCase
+    private val textProcessorUseCase: TextProcessorUseCase,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TextStylerState())
     val state: StateFlow<TextStylerState> = _state.asStateFlow()
+
+    init {
+        val saved = settingsRepository.load()
+        _state.update { it.copy(settings = saved) }
+    }
 
     fun handle(action: TextStylerAction) {
         when (action) {
@@ -49,6 +61,15 @@ class TextStylerViewModel(
             }
             is TextStylerAction.ClearError -> {
                 _state.update { it.copy(error = null) }
+            }
+            is TextStylerAction.ToggleSettings -> {
+                _state.update { it.copy(showSettings = !it.showSettings) }
+            }
+            is TextStylerAction.SaveSettings -> {
+                settingsRepository.save(action.settings)
+                _state.update {
+                    it.copy(settings = action.settings, showSettings = false, error = null)
+                }
             }
         }
     }

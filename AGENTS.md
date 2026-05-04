@@ -1,3 +1,4 @@
+<!-- From: c:\Users\jqwou\AndroidStudioProjects\side\AGENTS.md -->
 # SideAiEditor — Agent Guide
 
 This document describes the project structure, build process, and conventions for AI coding agents working on this codebase.
@@ -8,10 +9,16 @@ This document describes the project structure, build process, and conventions fo
 
 **SideAiEditor** is a multi-module Gradle project consisting of:
 
-1. **Android Application** (root module) — an AI-powered text editing and calendar planning app with a Jetpack Compose UI.
+1. **Android Application** (root module) — an AI-powered text editing app with a Jetpack Compose UI.
 2. **Kotlin/JVM Backend** (`backend` module) — a Ktor-based HTTP proxy server that forwards text processing requests to the OpenRouter AI API, keeping the API key server-side.
 
-The app is organized as two independent "mini-apps" (Text Styler and Calendar Planner) launched from a common home shell. It also integrates with the Android system as an `ACTION_PROCESS_TEXT` handler, appearing in the text selection menu of other apps.
+The app integrates with the Android system as an `ACTION_PROCESS_TEXT` handler (appears in the text selection menu of other apps) and as a voice assistant (`ACTION_VOICE_ASSIST`).
+
+The app supports two API modes:
+- **Local Backend** — sends requests to the local Ktor backend server.
+- **OpenRouter Direct** — sends requests directly to `https://openrouter.ai/api/v1/chat/completions` using the user's own API key and chosen model.
+
+The mode, API key, model, and backend URL are configurable via an in-app Settings screen and persisted in `SharedPreferences`.
 
 ---
 
@@ -26,13 +33,12 @@ The app is organized as two independent "mini-apps" (Text Styler and Calendar Pl
 | Min SDK | 29 |
 | Target SDK | 36 |
 | JVM Target | 17 |
-| Android UI | Jetpack Compose 1.6.2, Material3 1.2.0 |
+| Android UI | Jetpack Compose 1.6.2, Material3 1.2.0 (Telegram-style dark theme) |
 | Backend Framework | Ktor 3.3.1 (Client + Server, Netty engine) |
 | Backend Serialization | Kotlinx Serialization JSON |
 | Backend Logging | Logback Classic 1.5.13 |
 | Android Networking | `HttpURLConnection` (no Retrofit/OkHttp) |
 | Android JSON | `org.json.JSONObject` (built-in) |
-| Calendar Access | Android `CalendarContract` via `ContentResolver` |
 
 ---
 
@@ -50,27 +56,25 @@ side/
 │   └── kotlin/
 │       ├── openqwoutt/textprocessor/app/       # App shell
 │       │   ├── MainActivity.kt
-│       │   ├── SideAppRoot.kt                  # Navigation shell + home screen
+│       │   ├── SideAppRoot.kt                  # Root composable (launches TextStyler directly)
 │       │   └── TextProcessorApplication.kt
-│       ├── openqwoutt/textstyler/              # Text Styler mini-app
-│       │   ├── TextStylerMiniApp.kt            # Entry point (wires VM + Screen)
-│       │   ├── domain/
-│       │   │   ├── Models.kt                   # StyleMode enum (13 modes), ModeGroup, Result
-│       │   │   └── TextProcessorUseCase.kt     # Business logic + HTTP to backend
-│       │   ├── presentation/
-│       │   │   └── TextStylerViewModel.kt      # StateFlow-based VM
-│       │   └── ui/
-│       │       ├── TextStylerScreen.kt         # Main Compose UI (~388 lines)
-│       │       └── TextStylerActivity.kt       # ACTION_PROCESS_TEXT handler
-│       └── openqwoutt/calendarplanner/         # Calendar Planner mini-app
-│           ├── CalendarPlannerMiniApp.kt       # Entry point + permission launcher
+│       └── openqwoutt/textstyler/              # Text Styler mini-app
+│           ├── TextStylerMiniApp.kt            # Entry point (wires VM + Screen)
+│           ├── data/
+│           │   └── settings/
+│           │       ├── ApiMode.kt              # LOCAL_BACKEND / OPENROUTER_DIRECT
+│           │       ├── AppSettings.kt          # Data class for settings
+│           │       └── SettingsRepository.kt   # SharedPreferences wrapper
 │           ├── domain/
-│           │   ├── CalendarModels.kt           # Data classes
-│           │   └── CalendarRepository.kt       # ContentResolver queries/inserts
+│           │   ├── Models.kt                   # StyleMode enum (14 modes), ModeGroup, Result
+│           │   └── TextProcessorUseCase.kt     # Business logic + HTTP to backend or OpenRouter
 │           ├── presentation/
-│           │   └── CalendarPlannerViewModel.kt # State-based VM
+│           │   └── TextStylerViewModel.kt      # StateFlow-based VM
 │           └── ui/
-│               └── CalendarPlannerScreen.kt    # Compose UI (~507 lines)
+│               ├── TextStylerScreen.kt         # Main Compose UI
+│               ├── SettingsScreen.kt           # Settings UI (mode, key, model, URL)
+│               ├── TextStylerActivity.kt       # ACTION_PROCESS_TEXT handler
+│               └── VoiceAssistActivity.kt      # ACTION_VOICE_ASSIST handler
 └── backend/
     ├── build.gradle.kts          # Ktor/JVM build script
     ├── README.md                 # Backend run instructions
@@ -92,7 +96,7 @@ side/
 .\gradlew.bat assembleDebug -PAI_BACKEND_URL=http://192.168.1.50:8080
 ```
 
-The default `AI_BACKEND_URL` is `http://10.0.2.2:8080` (Android emulator loopback). It is injected into `BuildConfig.AI_BACKEND_URL` at compile time.
+The default `AI_BACKEND_URL` is `http://10.0.2.2:8080` (Android emulator loopback). It is injected into `BuildConfig.AI_BACKEND_URL` at compile time and used as the default backend URL in Settings.
 
 ### Backend
 
@@ -144,13 +148,14 @@ Valid `mode` values correspond to `StyleMode.id` entries defined in both the And
 
 ## Code Organization Conventions
 
-Each mini-app follows a layered structure:
+The app follows a layered structure:
 
-- **`domain/`** — Pure Kotlin business logic, models, and use cases. No Android framework dependencies except where unavoidable (e.g., `Context` in `CalendarRepository`).
-- **`presentation/`** — ViewModels exposing state (`StateFlow` or Compose `State`) and handling user actions via sealed classes (`TextStylerAction`, `CalendarPlannerAction`).
-- **`ui/`** — Compose screens and activities. UI is themed with custom dark color palettes per feature.
+- **`data/`** — Data layer: `SettingsRepository` wraps `SharedPreferences`.
+- **`domain/`** — Pure Kotlin business logic, models, and use cases.
+- **`presentation/`** — ViewModels exposing state (`StateFlow` or Compose `State`) and handling user actions via sealed classes (`TextStylerAction`).
+- **`ui/`** — Compose screens and activities. UI is themed with custom dark color palettes.
 
-The app shell (`openqwoutt.textprocessor.app`) hosts navigation via a simple `enum class AppSection` and `rememberSaveable` state.
+The app shell (`openqwoutt.textprocessor.app`) no longer hosts a home screen or navigation; it launches `TextStylerMiniApp` directly.
 
 ---
 
@@ -158,21 +163,37 @@ The app shell (`openqwoutt.textprocessor.app`) hosts navigation via a simple `en
 
 ### Text Styler — `StyleMode`
 
-There are 13 processing modes organized into three `ModeGroup`s:
+There are 14 processing modes organized into three `ModeGroup`s:
 
 - **MAIN**: `TRANSLATE`, `STYLE`, `FIX`
 - **STYLE**: `FORMAL`, `SHORT`, `TRIBAL`, `CORP`, `BIBLICAL`, `VIKING`, `ZEN`
 - **ACTION**: `OLD_EMOJI`, `SUMMARIZE`, `ANALYZE`, `SCREENSHOT`
 
-Each mode has an `id`, `displayName`, `shortName`, `icon`, `group`, and `prompt`. The prompt is sent to the backend and appended to a base system prompt. Input text is cleaned (trimmed, whitespace collapsed, control chars stripped) and capped at 3000 characters.
+Each mode has an `id`, `displayName`, `shortName`, `icon`, `group`, `prompt`, and `temperature`. The prompt is sent to the backend/OpenRouter and appended to a base system prompt. Input text is cleaned (trimmed, whitespace collapsed, control chars stripped) and capped at 3000 characters.
 
-### Calendar Planner
+### API Modes
 
-- Reads/writes the device's calendars via `CalendarContract`.
-- Requires `READ_CALENDAR` and `WRITE_CALENDAR` permissions at runtime.
-- Loads only visible, writable calendars (`CAL_ACCESS_CONTRIBUTOR` or higher).
-- Displays upcoming events for the next 7 days.
-- Adding an event also creates a 10-minute alert reminder.
+- **Local Backend** — `TextProcessorUseCase` POSTs to `backendUrl/api/text/process` with `{ text, mode }`.
+- **OpenRouter Direct** — `TextProcessorUseCase` POSTs to `https://openrouter.ai/api/v1/chat/completions` with the user's API key, chosen model, and a chat completion payload built from the mode's prompt.
+
+### Settings
+
+`SettingsScreen` allows the user to:
+- Toggle between **Local Backend** and **OpenRouter Direct**.
+- Enter an **OpenRouter API Key** (hidden input).
+- Select a **model** from a dropdown of free models or enter a custom one:
+  - `google/gemini-2.0-flash-exp:free`
+  - `deepseek/deepseek-chat:free`
+  - `meta-llama/llama-3.1-8b-instruct:free`
+  - `nousresearch/hermes-3-llama-3.1-405b:free`
+- Set the **Backend URL** (visible only in Local Backend mode).
+
+Settings are saved to `SharedPreferences` via `SettingsRepository`.
+
+### System Integration
+
+- **`ACTION_PROCESS_TEXT`** — `TextStylerActivity` appears in the text-selection menu of other apps. It shows a quick-action sheet for MAIN + SUMMARIZE + ANALYZE modes and returns the processed text (or copies it to clipboard in read-only contexts).
+- **`ACTION_VOICE_ASSIST`** — `VoiceAssistActivity` handles voice assistant invocations. If no spoken text is present in the intent, it launches the system speech recognizer, then presents the same quick-action sheet and copies the result to the clipboard.
 
 ---
 
@@ -196,7 +217,8 @@ There are no `src/test` or `src/androidTest` source directories yet. Manual test
 ## Security Considerations
 
 - **`android:usesCleartextTraffic="true"`** is enabled in `AndroidManifest.xml` to allow HTTP communication with the local backend. Do **not** ship a production build with this unless the backend is also local-only.
-- The **OpenRouter API key never touches the Android app**. It lives only as an environment variable on the backend server.
+- When using **OpenRouter Direct**, the user's API key is stored in `SharedPreferences` on the device. This is acceptable for personal use but should be noted for any production hardening.
+- The backend keeps the **OpenRouter API key server-side** only as an environment variable.
 - The backend enables **CORS with `anyHost()`** — acceptable for local development but should be restricted for production deployment.
 
 ---
@@ -204,11 +226,11 @@ There are no `src/test` or `src/androidTest` source directories yet. Manual test
 ## IDE & Environment
 
 - Developed in **Android Studio / IntelliJ IDEA**.
-- `gradle.properties` pins `org.gradle.java.home` to the IntelliJ bundled JBR path. This is machine-specific and may need adjustment on other workstations.
+- `gradle.properties` pins `org.gradle.java.home` to the Android Studio bundled JBR path. This is machine-specific and may need adjustment on other workstations.
 - Kotlin code style is set to `official`.
 
 ---
 
 ## Localization Notes
 
-The app UI text is primarily in **English**, but some strings in `SideAppRoot.kt` and user-facing messages in ViewModels are in **Russian** (e.g., home screen subtitle, error messages). When adding new user-facing text, follow the existing mixed pattern or consider moving strings to resources if full localization is desired.
+The app UI text is primarily in **English**, but some strings in ViewModels are in **Russian** (e.g., error messages). When adding new user-facing text, follow the existing mixed pattern or consider moving strings to resources if full localization is desired.

@@ -3,7 +3,7 @@ package openqwoutt.miniapp.textstyler.domain
 enum class ModeGroup {
     MAIN,
     STYLE,
-    ACTION
+    ANALYZE
 }
 
 enum class StyleMode(
@@ -12,15 +12,16 @@ enum class StyleMode(
     val shortName: String,
     val icon: String,
     val group: ModeGroup,
-    val prompt: String
+    val prompt: String,
+    val temperature: Double = 0.4
 ) {
-    TRANSLATE(
-        id = "translate",
-        displayName = "Translate",
-        shortName = "Translate",
-        icon = "A",
+    ANALYZE_MAIN(
+        id = "analyze",
+        displayName = "Analyze",
+        shortName = "Analyze",
+        icon = "?",
         group = ModeGroup.MAIN,
-        prompt = "Translate the text into natural English unless it is already English; if it is English, translate it into natural Russian. Return only the translated text."
+        prompt = "Analyze the text: intent, tone, key points, weak spots, and suggested improvements. Keep it concise."
     ),
     STYLE(
         id = "style",
@@ -60,7 +61,8 @@ enum class StyleMode(
         shortName = "Tribal",
         icon = "T",
         group = ModeGroup.STYLE,
-        prompt = "Rewrite the text with vivid, primal, clan-like energy while keeping it readable and respectful. Return only the result."
+        prompt = "Rewrite the text with vivid, primal, clan-like energy while keeping it readable and respectful. Return only the result.",
+        temperature = 0.7
     ),
     CORP(
         id = "style_corp",
@@ -76,7 +78,8 @@ enum class StyleMode(
         shortName = "Biblical",
         icon = "B",
         group = ModeGroup.STYLE,
-        prompt = "Rewrite the text in an elevated biblical cadence without adding religious claims. Return only the result."
+        prompt = "Rewrite the text in an elevated biblical cadence without adding religious claims. Return only the result.",
+        temperature = 0.7
     ),
     VIKING(
         id = "style_viking",
@@ -84,7 +87,8 @@ enum class StyleMode(
         shortName = "Viking",
         icon = "V",
         group = ModeGroup.STYLE,
-        prompt = "Rewrite the text with bold old-norse saga energy while preserving the meaning. Return only the result."
+        prompt = "Rewrite the text with bold old-norse saga energy while preserving the meaning. Return only the result.",
+        temperature = 0.7
     ),
     ZEN(
         id = "style_zen",
@@ -99,32 +103,17 @@ enum class StyleMode(
         displayName = "Emojify",
         shortName = "Emojify",
         icon = ":)",
-        group = ModeGroup.ACTION,
-        prompt = "Add fitting old-school emoticons such as T_T, ^_^, :-) without changing the wording. Return only the modified text."
+        group = ModeGroup.STYLE,
+        prompt = "Add fitting old-school emoticons such as T_T, ^_^, :-) without changing the wording. Return only the modified text.",
+        temperature = 0.6
     ),
     SUMMARIZE(
         id = "summarize",
         displayName = "Summarize",
         shortName = "Summary",
         icon = "=",
-        group = ModeGroup.ACTION,
+        group = ModeGroup.ANALYZE,
         prompt = "Summarize the text into the clearest useful version. Use short bullets only if that helps. Return only the summary."
-    ),
-    ANALYZE(
-        id = "analyze",
-        displayName = "Analyze",
-        shortName = "Analyze",
-        icon = "?",
-        group = ModeGroup.ACTION,
-        prompt = "Analyze the text: intent, tone, key points, weak spots, and suggested improvements. Keep it concise."
-    ),
-    SCREENSHOT(
-        id = "screenshot_analysis",
-        displayName = "Screen",
-        shortName = "Screen",
-        icon = "[]",
-        group = ModeGroup.ACTION,
-        prompt = "Act as a screen-aware assistant. The user may paste OCR text or a description from a screenshot. Explain what is visible, what matters, and what action to take next."
     )
 }
 
