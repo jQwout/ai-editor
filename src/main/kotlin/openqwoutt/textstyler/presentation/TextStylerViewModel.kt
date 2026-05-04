@@ -1,6 +1,7 @@
 package openqwoutt.miniapp.textstyler.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +24,6 @@ data class TextStylerState(
     val isTextTruncated: Boolean = false,
     val showSettings: Boolean = false,
     val settings: AppSettings = AppSettings(),
-    val onResultReady: ((String) -> Unit)? = null,
     val closeBehavior: CloseBehavior = CloseBehavior.NavigateBack
 )
 
@@ -53,6 +53,8 @@ class TextStylerViewModel(
 
     private val _state = MutableStateFlow(TextStylerState())
     val state: StateFlow<TextStylerState> = _state.asStateFlow()
+
+    private var onResultReady: ((String) -> Unit)? = null
 
     init {
         val saved = settingsRepository.load()
@@ -96,7 +98,7 @@ class TextStylerViewModel(
                 _state.update { it.copy(closeBehavior = action.behavior) }
             }
             is TextStylerAction.SetOnResultReady -> {
-                _state.update { it.copy(onResultReady = action.callback) }
+                onResultReady = action.callback
             }
         }
     }
@@ -126,7 +128,7 @@ class TextStylerViewModel(
                         )
                     }
                     // Trigger callback if set
-                    currentState.onResultReady?.invoke(result.result)
+                    onResultReady?.invoke(result.result)
                 }
                 TextStylerResult.EmptyInput -> {
                     _state.update {
@@ -140,5 +142,18 @@ class TextStylerViewModel(
                 }
             }
         }
+    }
+}
+
+class TextStylerViewModelFactory(
+    private val textProcessorUseCase: TextProcessorUseCase,
+    private val settingsRepository: SettingsRepository
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TextStylerViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return TextStylerViewModel(textProcessorUseCase, settingsRepository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

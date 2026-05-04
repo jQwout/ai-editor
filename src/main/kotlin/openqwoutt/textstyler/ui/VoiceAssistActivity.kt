@@ -9,6 +9,7 @@ import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -18,8 +19,20 @@ import openqwoutt.miniapp.textstyler.presentation.CloseBehavior
 
 class VoiceAssistActivity : ComponentActivity() {
 
-    companion object {
-        private const val REQ_SPEECH = 101
+    private val speechRecognizerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val results = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val text = results?.firstOrNull().orEmpty()
+            if (text.isNotBlank()) {
+                showUnifiedScreen(text)
+            } else {
+                finish()
+            }
+        } else {
+            finish()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,11 +43,10 @@ class VoiceAssistActivity : ComponentActivity() {
 
         if (spokenText.isBlank()) {
             startSpeechRecognizer()
-            return
+        } else {
+            // Show unified screen with voice input
+            showUnifiedScreen(spokenText)
         }
-
-        // Show unified screen with voice input
-        showUnifiedScreen(spokenText)
     }
 
     private fun startSpeechRecognizer() {
@@ -44,25 +56,9 @@ class VoiceAssistActivity : ComponentActivity() {
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
         runCatching {
-            startActivityForResult(intent, REQ_SPEECH)
+            speechRecognizerLauncher.launch(intent)
         }.onFailure {
             Toast.makeText(this, "Speech recognition is not available", Toast.LENGTH_SHORT).show()
-            finish()
-        }
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ_SPEECH && resultCode == RESULT_OK) {
-            val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            val text = results?.firstOrNull().orEmpty()
-            if (text.isNotBlank()) {
-                showUnifiedScreen(text)
-            } else {
-                finish()
-            }
-        } else {
             finish()
         }
     }
