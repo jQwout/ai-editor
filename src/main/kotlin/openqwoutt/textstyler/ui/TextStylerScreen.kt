@@ -3,7 +3,17 @@ package openqwoutt.miniapp.textstyler.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateColor
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -15,144 +25,239 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.CopyAll
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import openqwoutt.miniapp.textstyler.domain.ModeGroup
 import openqwoutt.miniapp.textstyler.domain.StyleMode
+import openqwoutt.miniapp.textstyler.presentation.CloseBehavior
 import openqwoutt.miniapp.textstyler.presentation.TextStylerAction
 import openqwoutt.miniapp.textstyler.presentation.TextStylerState
 
-private val AppBg = Color(0xFF0D0D11)
-private val Panel = Color(0xFF1B1B20)
-private val PanelLight = Color(0xFF23232A)
-private val Accent = Color(0xFF8D78F0)
-private val AccentDark = Color(0xFF302D42)
-private val TextPrimary = Color(0xFFF4F1F8)
-private val TextSecondary = Color(0xFFB9B5C3)
+// Telegram-style dark palette
+private val Bg = Color(0xFF0F0F0F)
+private val Surface = Color(0xFF1A1A1A)
+private val Accent = Color(0xFF8774E1)
+private val AccentSoft = Color(0xFF8774E1).copy(alpha = 0.15f)
+private val TextPrimary = Color(0xFFFFFFFF)
+private val TextSecondary = Color(0xFF8E8E93)
+private val Divider = Color(0xFF2C2C2E)
+private val ErrorBg = Color(0xFF3A2228)
+private val ErrorText = Color(0xFFFFC4CF)
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Animation durations
+private const val TAB_ANIMATION_DURATION = 200
+private const val STRIP_ANIMATION_DURATION = 250
+private const val RESULT_ANIMATION_DURATION = 300
+private const val SETTINGS_ANIMATION_DURATION = 300
+
 @Composable
 fun TextStylerScreen(
     state: TextStylerState,
     onAction: (TextStylerAction) -> Unit,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
-    Scaffold(containerColor = AppBg) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(AppBg)
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Header(onNavigateBack = onNavigateBack)
-            MainModeTabs(state = state, onAction = onAction)
+    // Handle close behavior - when result is ready, trigger the callback
+    state.result?.let { resultText ->
+        state.onResultReady?.let { callback ->
+            // The callback is triggered in the ViewModel when result is set
+        }
+    }
 
-            Surface(
+    // Settings modal with crossfade animation
+    Crossfade(
+        targetState = state.showSettings,
+        animationSpec = tween(SETTINGS_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+        label = "settings_crossfade",
+        modifier = modifier
+    ) { showSettings ->
+        if (showSettings) {
+            // Settings backdrop with fade
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                color = Panel,
-                shape = RoundedCornerShape(28.dp)
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    StyleStrip(state = state, onAction = onAction)
-                    ActionStrip(state = state, onAction = onAction)
-                    EditorBlock(
-                        state = state,
-                        onAction = onAction,
-                        clipboard = clipboard
-                    )
-                    ResultBlock(state = state, clipboard = clipboard, onAction = onAction)
-                }
+                SettingsScreen(
+                    settings = state.settings,
+                    onSave = { onAction(TextStylerAction.SaveSettings(it)) },
+                    onBack = { onAction(TextStylerAction.ToggleSettings) }
+                )
             }
-
-            BottomActions(
+        } else {
+            // Main content
+            MainContent(
                 state = state,
-                onApply = { onAction(TextStylerAction.ProcessText) }
+                onAction = onAction,
+                onNavigateBack = onNavigateBack,
+                clipboard = clipboard
             )
         }
     }
 }
 
 @Composable
-private fun Header(onNavigateBack: () -> Unit) {
+private fun MainContent(
+    state: TextStylerState,
+    onAction: (TextStylerAction) -> Unit,
+    onNavigateBack: () -> Unit,
+    clipboard: ClipboardManager
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Bg)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Header(
+                onNavigateBack = onNavigateBack,
+                onOpenSettings = { onAction(TextStylerAction.ToggleSettings) }
+            )
+
+            MainModeTabs(state = state, onAction = onAction)
+
+            // StyleStrip with expand/collapse animation (250ms)
+            AnimatedVisibility(
+                visible = state.selectedMode == StyleMode.STYLE,
+                enter = expandVertically(
+                    animationSpec = tween(STRIP_ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                ) + fadeIn(tween(STRIP_ANIMATION_DURATION, easing = FastOutSlowInEasing)),
+                exit = shrinkVertically(
+                    animationSpec = tween(STRIP_ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                ) + fadeOut(tween(STRIP_ANIMATION_DURATION, easing = FastOutSlowInEasing))
+            ) {
+                StyleStrip(state = state, onAction = onAction)
+            }
+
+            // AnalyzeStrip with expand/collapse animation
+            AnimatedVisibility(
+                visible = state.selectedMode == StyleMode.ANALYZE_MAIN,
+                enter = expandVertically(
+                    animationSpec = tween(STRIP_ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                ) + fadeIn(tween(STRIP_ANIMATION_DURATION, easing = FastOutSlowInEasing)),
+                exit = shrinkVertically(
+                    animationSpec = tween(STRIP_ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                ) + fadeOut(tween(STRIP_ANIMATION_DURATION, easing = FastOutSlowInEasing))
+            ) {
+                AnalyzeStrip(state = state, onAction = onAction)
+            }
+
+            EditorBlock(
+                state = state,
+                onAction = onAction,
+                clipboard = clipboard
+            )
+
+            // Result block with fade + slide animation (300ms)
+            AnimatedVisibility(
+                visible = state.result != null || state.isLoading,
+                enter = fadeIn(tween(RESULT_ANIMATION_DURATION, easing = FastOutSlowInEasing)) +
+                        slideInVertically(
+                            initialOffsetY = { it / 2 },
+                            animationSpec = tween(RESULT_ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                        ),
+                exit = fadeOut(tween(RESULT_ANIMATION_DURATION / 2))
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Divider)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ResultBlock(
+                        state = state,
+                        clipboard = clipboard,
+                        onAction = onAction
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            BottomActions(
+                state = state,
+                onApply = { onAction(TextStylerAction.ProcessText) }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun Header(
+    onNavigateBack: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onNavigateBack, modifier = Modifier.size(48.dp)) {
-                Text("X", color = TextSecondary, style = MaterialTheme.typography.titleLarge)
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "AI Editor",
-                color = TextPrimary,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+        IconButton(onClick = onNavigateBack, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Close",
+                tint = TextSecondary
             )
         }
-        Surface(
-            shape = CircleShape,
-            color = Color.Transparent,
-            border = BorderStroke(2.dp, TextSecondary.copy(alpha = 0.7f))
-        ) {
-            Text(
-                text = "?",
-                color = TextSecondary,
-                modifier = Modifier.size(28.dp).padding(top = 2.dp),
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Bold
+        Text(
+            text = "AI Editor",
+            color = TextPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        IconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Default.Settings,
+                contentDescription = "Settings",
+                tint = TextSecondary
             )
         }
     }
@@ -163,27 +268,46 @@ private fun MainModeTabs(state: TextStylerState, onAction: (TextStylerAction) ->
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Panel, RoundedCornerShape(38.dp))
-            .padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Surface)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         StyleMode.entries.filter { it.group == ModeGroup.MAIN }.forEach { mode ->
             val selected = state.selectedMode == mode
-            Surface(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(32.dp),
-                color = if (selected) AccentDark else Color.Transparent,
-                onClick = { onAction(TextStylerAction.SelectMode(mode)) }
+
+            // Animated background color (200ms)
+            val animatedBg by animateColorAsState(
+                targetValue = if (selected) Accent else Color.Transparent,
+                animationSpec = tween(TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+                label = "tab_bg"
+            )
+
+            // Animated text color (200ms)
+            val animatedTextColor by animateColorAsState(
+                targetValue = if (selected) Color.White else TextSecondary,
+                animationSpec = tween(TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+                label = "tab_text"
+            )
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(animatedBg)
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    modifier = Modifier.padding(vertical = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                TextButton(
+                    onClick = { onAction(TextStylerAction.SelectMode(mode)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
-                    Text(mode.icon, color = if (selected) Accent else TextSecondary)
                     Text(
                         text = mode.shortName,
-                        color = if (selected) Accent else TextSecondary,
-                        fontWeight = FontWeight.Bold
+                        color = animatedTextColor,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
                     )
                 }
             }
@@ -194,47 +318,92 @@ private fun MainModeTabs(state: TextStylerState, onAction: (TextStylerAction) ->
 @Composable
 private fun StyleStrip(state: TextStylerState, onAction: (TextStylerAction) -> Unit) {
     Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(18.dp)
+        modifier = Modifier
+            .horizontalScroll(rememberScrollState())
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         StyleMode.entries.filter { it.group == ModeGroup.STYLE }.forEach { mode ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(mode.icon, color = TextPrimary, fontWeight = FontWeight.Bold)
-                FilterChip(
-                    selected = state.selectedMode == mode,
-                    onClick = { onAction(TextStylerAction.SelectMode(mode)) },
-                    label = { Text(mode.shortName) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Color.Transparent,
-                        labelColor = TextSecondary,
-                        selectedContainerColor = AccentDark,
-                        selectedLabelColor = Accent
-                    ),
+            val selected = state.selectedMode == mode
+            val bg = if (selected) AccentSoft else Color.Transparent
+            val textColor = if (selected) Accent else TextSecondary
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(bg)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = mode.icon,
+                    fontSize = 20.sp,
+                    color = if (selected) Accent else TextPrimary
                 )
+                Spacer(modifier = Modifier.height(2.dp))
+                TextButton(
+                    onClick = { onAction(TextStylerAction.SelectMode(mode)) },
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text = mode.shortName,
+                        color = textColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ActionStrip(state: TextStylerState, onAction: (TextStylerAction) -> Unit) {
+private fun AnalyzeStrip(state: TextStylerState, onAction: (TextStylerAction) -> Unit) {
     Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Surface)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        StyleMode.entries.filter { it.group == ModeGroup.ACTION }.forEach { mode ->
-            FilterChip(
-                selected = state.selectedMode == mode,
-                onClick = { onAction(TextStylerAction.SelectMode(mode)) },
-                label = { Text(mode.displayName) },
-                leadingIcon = { Text(mode.icon) },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = PanelLight,
-                    labelColor = TextSecondary,
-                    selectedContainerColor = AccentDark,
-                    selectedLabelColor = Accent
-                )
+        StyleMode.entries.filter { it.group == ModeGroup.ANALYZE || it == StyleMode.ANALYZE_MAIN }.forEach { mode ->
+            val selected = state.selectedMode == mode
+
+            // Animated background color
+            val animatedBg by animateColorAsState(
+                targetValue = if (selected) Accent else Color.Transparent,
+                animationSpec = tween(TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+                label = "analyze_tab_bg"
             )
+
+            val animatedTextColor by animateColorAsState(
+                targetValue = if (selected) Color.White else TextSecondary,
+                animationSpec = tween(TAB_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+                label = "analyze_tab_text"
+            )
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(animatedBg)
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                TextButton(
+                    onClick = { onAction(TextStylerAction.SelectMode(mode)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text = mode.shortName,
+                        color = animatedTextColor,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
         }
     }
 }
@@ -245,50 +414,98 @@ private fun EditorBlock(
     onAction: (TextStylerAction) -> Unit,
     clipboard: ClipboardManager
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Surface)
+            .padding(16.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Original", color = TextPrimary, fontWeight = FontWeight.Bold)
-            TextButton(
+            Text(
+                text = "Original",
+                color = TextSecondary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            IconButton(
                 onClick = {
                     val clipData = clipboard.primaryClip
                     val text = clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
                     if (!text.isNullOrBlank()) {
                         onAction(TextStylerAction.SetInputText(text))
                     }
-                }
+                },
+                modifier = Modifier.size(32.dp)
             ) {
-                Icon(Icons.Default.ContentPaste, contentDescription = null, tint = TextSecondary)
-                Spacer(Modifier.width(6.dp))
-                Text("Paste", color = TextSecondary)
+                Icon(
+                    Icons.Default.ContentPaste,
+                    contentDescription = "Paste",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
-        OutlinedTextField(
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        BasicTextField(
             value = state.inputText,
             onValueChange = { onAction(TextStylerAction.SetInputText(it)) },
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 220.dp),
-            placeholder = { Text("Type text, dictate, or paste OCR from a screenshot...", color = TextSecondary) },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+                .height(180.dp),
+            textStyle = TextStyle(
+                color = TextPrimary,
+                fontSize = 17.sp,
+                lineHeight = 24.sp
+            ),
+            cursorBrush = SolidColor(Accent),
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Sentences,
                 imeAction = ImeAction.Done
-            )
+            ),
+            decorationBox = { innerTextField ->
+                Box {
+                    if (state.inputText.isEmpty()) {
+                        Text(
+                            text = "Type or paste text...",
+                            color = TextSecondary.copy(alpha = 0.5f),
+                            fontSize = 17.sp
+                        )
+                    }
+                    innerTextField()
+                }
+            }
         )
-        state.error?.let { error ->
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF3A2228))) {
+
+        // Error display with fade animation
+        AnimatedVisibility(
+            visible = state.error != null,
+            enter = fadeIn(tween(200)) + slideInVertically(),
+            exit = fadeOut(tween(200))
+        ) {
+            state.error?.let { error ->
+                Spacer(modifier = Modifier.height(10.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ErrorBg)
+                        .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(error, color = Color(0xFFFFC4CF), modifier = Modifier.weight(1f))
-                    TextButton(onClick = { onAction(TextStylerAction.ClearError) }) {
-                        Text("OK", color = Color(0xFFFFC4CF))
+                    Text(error, color = ErrorText, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    TextButton(
+                        onClick = { onAction(TextStylerAction.ClearError) },
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("OK", color = ErrorText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -302,87 +519,118 @@ private fun ResultBlock(
     clipboard: ClipboardManager,
     onAction: (TextStylerAction) -> Unit
 ) {
-    state.result?.let { resultText ->
-        Card(
-            colors = CardDefaults.cardColors(containerColor = PanelLight),
-            shape = RoundedCornerShape(18.dp)
+    // Show loading or result
+    if (state.result != null) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Surface)
+                .padding(16.dp)
         ) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Result", color = Accent, fontWeight = FontWeight.Bold)
-                    Row {
-                        IconButton(onClick = {
-                            clipboard.setPrimaryClip(ClipData.newPlainText("AI Editor Result", resultText))
-                        }) {
-                            Icon(Icons.Default.CopyAll, contentDescription = "Copy", tint = Accent)
-                        }
-                        TextButton(onClick = { onAction(TextStylerAction.ClearResult) }) {
-                            Text("Clear", color = TextSecondary)
-                        }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = state.selectedMode.displayName,
+                    color = Accent,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Row {
+                    IconButton(
+                        onClick = {
+                            clipboard.setPrimaryClip(ClipData.newPlainText("AI Editor Result", state.result))
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.CopyAll,
+                            contentDescription = "Copy",
+                            tint = Accent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { onAction(TextStylerAction.ClearResult) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Clear",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
-                if (state.isTextTruncated) {
-                    Text("Input was trimmed to 3000 characters.", color = TextSecondary)
-                }
-                Text(resultText, color = TextPrimary)
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (state.isTextTruncated) {
+                Text(
+                    "Input was trimmed to 3000 characters.",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            Text(
+                text = state.result,
+                color = TextPrimary,
+                fontSize = 17.sp,
+                lineHeight = 24.sp
+            )
+        }
+    } else if (state.isLoading) {
+        // Loading placeholder with fade
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Surface),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(32.dp),
+                strokeWidth = 3.dp,
+                color = Accent
+            )
         }
     }
 }
 
 @Composable
 private fun BottomActions(state: TextStylerState, onApply: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Button(
+        onClick = onApply,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp),
+        enabled = !state.isLoading,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Accent,
+            disabledContainerColor = Accent.copy(alpha = 0.4f)
+        ),
+        shape = RoundedCornerShape(24.dp)
     ) {
-        Button(
-            onClick = onApply,
-            modifier = Modifier.weight(1f).height(58.dp),
-            enabled = !state.isLoading,
-            colors = ButtonDefaults.buttonColors(containerColor = Accent),
-            shape = RoundedCornerShape(28.dp)
-        ) {
-            if (state.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = Color.White
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("WORKING", color = Color.White, fontWeight = FontWeight.Bold)
-            } else {
-                Text("APPLY", color = Color.White, fontWeight = FontWeight.Bold)
-            }
+        if (state.isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = Color.White
+            )
+        } else {
+            Text(
+                "Apply",
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp
+            )
         }
-        Button(
-            onClick = onApply,
-            modifier = Modifier.size(58.dp),
-            enabled = !state.isLoading,
-            colors = ButtonDefaults.buttonColors(containerColor = Accent),
-            shape = CircleShape,
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = Color.White)
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun TextStylerScreenPreview() {
-    MaterialTheme {
-        TextStylerScreen(
-            state = TextStylerState(
-                inputText = "Example text that needs a sharper style.",
-                selectedMode = StyleMode.STYLE
-            ),
-            onAction = {}
-        )
     }
 }

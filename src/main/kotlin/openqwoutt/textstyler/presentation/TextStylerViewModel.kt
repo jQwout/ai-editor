@@ -10,15 +10,29 @@ import kotlinx.coroutines.launch
 import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.domain.TextStylerResult
+import openqwoutt.textstyler.data.settings.AppSettings
+import openqwoutt.textstyler.data.settings.SettingsRepository
 
 data class TextStylerState(
     val inputText: String = "",
+    val initialInputText: String? = null,
     val selectedMode: StyleMode = StyleMode.STYLE,
     val result: String? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isTextTruncated: Boolean = false
+    val isTextTruncated: Boolean = false,
+    val showSettings: Boolean = false,
+    val settings: AppSettings = AppSettings(),
+    val onResultReady: ((String) -> Unit)? = null,
+    val closeBehavior: CloseBehavior = CloseBehavior.NavigateBack
 )
+
+enum class CloseBehavior {
+    NavigateBack,
+    FinishActivity,
+    FinishWithResult,
+    CopyToClipboard
+}
 
 sealed class TextStylerAction {
     data class SetInputText(val text: String) : TextStylerAction()
@@ -26,14 +40,33 @@ sealed class TextStylerAction {
     data object ProcessText : TextStylerAction()
     data object ClearResult : TextStylerAction()
     data object ClearError : TextStylerAction()
+    data object ToggleSettings : TextStylerAction()
+    data class SaveSettings(val settings: AppSettings) : TextStylerAction()
+    data class SetCloseBehavior(val behavior: CloseBehavior) : TextStylerAction()
+    data class SetOnResultReady(val callback: (String) -> Unit) : TextStylerAction()
 }
 
 class TextStylerViewModel(
-    private val textProcessorUseCase: TextProcessorUseCase
+    private val textProcessorUseCase: TextProcessorUseCase,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TextStylerState())
     val state: StateFlow<TextStylerState> = _state.asStateFlow()
+
+    init {
+        val saved = settingsRepository.load()
+        _state.update { it.copy(settings = saved) }
+
+        // Apply initial input text if provided
+        _state.value.initialInputText?.let { initialText ->
+            _state.update { it.copy(inputText = initialText) }
+        }
+    }
+
+    fun setInitialInputText(text: String) {
+        _state.update { it.copy(initialInputText = text, inputText = text) }
+    }
 
     fun handle(action: TextStylerAction) {
         when (action) {
@@ -49,6 +82,21 @@ class TextStylerViewModel(
             }
             is TextStylerAction.ClearError -> {
                 _state.update { it.copy(error = null) }
+            }
+            is TextStylerAction.ToggleSettings -> {
+                _state.update { it.copy(showSettings = !it.showSettings) }
+            }
+            is TextStylerAction.SaveSettings -> {
+                settingsRepository.save(action.settings)
+                _state.update {
+                    it.copy(settings = action.settings, showSettings = false, error = null)
+                }
+            }
+            is TextStylerAction.SetCloseBehavior -> {
+                _state.update { it.copy(closeBehavior = action.behavior) }
+            }
+            is TextStylerAction.SetOnResultReady -> {
+                _state.update { it.copy(onResultReady = action.callback) }
             }
         }
     }
@@ -77,6 +125,8 @@ class TextStylerViewModel(
                             isTextTruncated = currentState.inputText.length > 3000
                         )
                     }
+                    // Trigger callback if set
+                    currentState.onResultReady?.invoke(result.result)
                 }
                 TextStylerResult.EmptyInput -> {
                     _state.update {
