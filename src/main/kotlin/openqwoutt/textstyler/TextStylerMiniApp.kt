@@ -44,7 +44,9 @@ fun TextStylerMiniApp(
         }
         viewModel.handle(TextStylerAction.SetCloseBehavior(closeBehavior))
         if (onResultReady != null) {
-            viewModel.handle(TextStylerAction.SetOnResultReady(onResultReady))
+            viewModel.handle(TextStylerAction.SetOnResultReady(onResultReady, onNavigateBack))
+        } else {
+            viewModel.handle(TextStylerAction.SetOnResultReady({}, onNavigateBack))
         }
     }
 

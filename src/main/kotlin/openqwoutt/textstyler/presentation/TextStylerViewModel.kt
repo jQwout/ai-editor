@@ -42,12 +42,13 @@ sealed class TextStylerAction {
     data object ClearError : TextStylerAction()
     data object ToggleSettings : TextStylerAction()
     data class SaveSettings(val settings: AppSettings) : TextStylerAction()
+    data class ReloadUseCaseWithSettings(val settings: AppSettings) : TextStylerAction()
     data class SetCloseBehavior(val behavior: CloseBehavior) : TextStylerAction()
-    data class SetOnResultReady(val callback: (String) -> Unit) : TextStylerAction()
+    data class SetOnResultReady(val callback: (String) -> Unit, val onClose: () -> Unit = {}) : TextStylerAction()
 }
 
 class TextStylerViewModel(
-    private val textProcessorUseCase: TextProcessorUseCase,
+    private var textProcessorUseCase: TextProcessorUseCase,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
@@ -55,6 +56,7 @@ class TextStylerViewModel(
     val state: StateFlow<TextStylerState> = _state.asStateFlow()
 
     private var onResultReady: ((String) -> Unit)? = null
+    private var onClose: (() -> Unit)? = null
 
     init {
         val saved = settingsRepository.load()
@@ -93,12 +95,18 @@ class TextStylerViewModel(
                 _state.update {
                     it.copy(settings = action.settings, showSettings = false, error = null)
                 }
+                // Reload the use case with new settings
+                textProcessorUseCase = TextProcessorUseCase(settings = action.settings)
+            }
+            is TextStylerAction.ReloadUseCaseWithSettings -> {
+                textProcessorUseCase = TextProcessorUseCase(settings = action.settings)
             }
             is TextStylerAction.SetCloseBehavior -> {
                 _state.update { it.copy(closeBehavior = action.behavior) }
             }
             is TextStylerAction.SetOnResultReady -> {
                 onResultReady = action.callback
+                onClose = action.onClose
             }
         }
     }
@@ -127,8 +135,19 @@ class TextStylerViewModel(
                             isTextTruncated = currentState.inputText.length > 3000
                         )
                     }
-                    // Trigger callback if set
-                    onResultReady?.invoke(result.result)
+                    // Execute callback and/or close based on closeBehavior
+                    when (_state.value.closeBehavior) {
+                        CloseBehavior.FinishWithResult -> {
+                            onResultReady?.invoke(result.result)
+                            onClose?.invoke()
+                        }
+                        CloseBehavior.CopyToClipboard -> {
+                            onResultReady?.invoke(result.result)
+                        }
+                        CloseBehavior.NavigateBack, CloseBehavior.FinishActivity -> {
+                            // Do nothing extra, just show result
+                        }
+                    }
                 }
                 TextStylerResult.EmptyInput -> {
                     _state.update {

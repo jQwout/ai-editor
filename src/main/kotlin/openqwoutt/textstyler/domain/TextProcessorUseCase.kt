@@ -3,6 +3,7 @@ package openqwoutt.miniapp.textstyler.domain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import openqwoutt.textprocessor.app.BuildConfig
+import openqwoutt.textstyler.data.settings.AppSettings
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.OutputStreamWriter
@@ -11,8 +12,11 @@ import java.net.URL
 
 class TextProcessorUseCase(
     private val maxChars: Int = 3000,
-    private val backendUrl: String = BuildConfig.AI_BACKEND_URL
+    private val backendUrl: String = BuildConfig.AI_BACKEND_URL,
+    settings: AppSettings? = null
 ) {
+    private val effectiveBackendUrl = settings?.backendUrl?.takeIf { it.isNotBlank() } ?: backendUrl
+
     suspend fun processText(inputText: String, mode: StyleMode): TextStylerResult {
         if (inputText.isBlank()) {
             return TextStylerResult.EmptyInput
@@ -36,7 +40,7 @@ class TextProcessorUseCase(
     }
 
     private suspend fun sendToBackend(text: String, mode: StyleMode): String = withContext(Dispatchers.IO) {
-        val endpoint = "${backendUrl.trimEnd('/')}/api/text/process"
+        val endpoint = "${effectiveBackendUrl.trimEnd('/')}/api/text/process"
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15_000
