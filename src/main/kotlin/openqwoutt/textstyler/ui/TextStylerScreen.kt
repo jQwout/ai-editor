@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,10 +34,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.CopyAll
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -69,6 +72,8 @@ import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.presentation.CloseBehavior
 import openqwoutt.miniapp.textstyler.presentation.TextStylerAction
 import openqwoutt.miniapp.textstyler.presentation.TextStylerState
+import openqwoutt.textstyler.data.prompts.PromptCategory
+import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AppSettings
 
 // Telegram-style dark palette
@@ -119,13 +124,42 @@ fun TextStylerScreen(
                 )
             }
         } else {
-            // Main content
-            MainContent(
-                state = state,
-                onAction = onAction,
-                onNavigateBack = onNavigateBack,
-                clipboard = clipboard
-            )
+            // Templates modal
+            Crossfade(
+                targetState = state.showTemplates,
+                animationSpec = tween(SETTINGS_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+                label = "templates_crossfade"
+            ) { showTemplates ->
+                if (showTemplates) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f))
+                    ) {
+                        TemplatesSheet(
+                            templates = state.availableTemplates,
+                            selectedTemplate = state.selectedTemplate,
+                            onSelect = { template ->
+                                onAction(TextStylerAction.SelectTemplate(template))
+                                onAction(TextStylerAction.HideTemplates)
+                            },
+                            onClear = {
+                                onAction(TextStylerAction.SelectTemplate(null))
+                                onAction(TextStylerAction.HideTemplates)
+                            },
+                            onBack = { onAction(TextStylerAction.HideTemplates) }
+                        )
+                    }
+                } else {
+                    // Main content
+                    MainContent(
+                        state = state,
+                        onAction = onAction,
+                        onNavigateBack = onNavigateBack,
+                        clipboard = clipboard
+                    )
+                }
+            }
         }
     }
 }
@@ -150,8 +184,10 @@ private fun MainContent(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Header(
+                state = state,
                 onNavigateBack = onNavigateBack,
-                onOpenSettings = { onAction(TextStylerAction.ToggleSettings) }
+                onOpenSettings = { onAction(TextStylerAction.ToggleSettings) },
+                onOpenTemplates = { onAction(TextStylerAction.ShowTemplates) }
             )
 
             MainModeTabs(state = state, onAction = onAction)
@@ -229,8 +265,10 @@ private fun MainContent(
 
 @Composable
 private fun Header(
+    state: TextStylerState,
     onNavigateBack: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenTemplates: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -246,12 +284,32 @@ private fun Header(
                 tint = TextSecondary
             )
         }
-        Text(
-            text = "AI Editor",
-            color = TextPrimary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+        
+        // Template indicator or title
+        if (state.selectedTemplate != null) {
+            TextButton(onClick = onOpenTemplates) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = Accent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.size(4.dp))
+                Text(
+                    text = state.selectedTemplate.name,
+                    color = Accent,
+                    fontSize = 14.sp
+                )
+            }
+        } else {
+            Text(
+                text = "AI Editor",
+                color = TextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        
         IconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
             Icon(
                 Icons.Default.Settings,
@@ -765,5 +823,114 @@ private fun SettingsToggleRow(
                 uncheckedTrackColor = Surface
             )
         )
+    }
+}
+
+@Composable
+fun TemplatesSheet(
+    templates: List<PromptTemplate>,
+    selectedTemplate: PromptTemplate?,
+    onSelect: (PromptTemplate) -> Unit,
+    onClear: () -> Unit,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Bg)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = TextSecondary
+                )
+            }
+            Text(
+                text = "AI Templates",
+                color = TextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (selectedTemplate != null) {
+                TextButton(onClick = onClear) {
+                    Text(
+                        text = "Clear",
+                        color = Accent,
+                        fontSize = 14.sp
+                    )
+                )
+            } else {
+                Spacer(modifier = Modifier.size(48.dp))
+            }
+        }
+
+        // Templates grouped by category
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val categories = listOf(
+                PromptCategory.TRANSFORM to "Transform",
+                PromptCategory.ANALYSIS to "Analysis",
+                PromptCategory.CREATE to "Create",
+                PromptCategory.FORMAT to "Format"
+            )
+
+            categories.forEach { (category, label) ->
+                val categoryTemplates = templates.filter { it.category == category }
+                if (categoryTemplates.isNotEmpty()) {
+                    Text(
+                        text = label,
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    )
+                    
+                    categoryTemplates.forEach { template ->
+                        val isSelected = selectedTemplate?.id == template.id
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) AccentSoft else Surface)
+                                .padding(12.dp)
+                                .then(
+                                    Modifier.clickable { onSelect(template) }
+                                )
+                        ) {
+                            Column {
+                                Text(
+                                    text = template.name,
+                                    color = if (isSelected) Accent else TextPrimary,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                if (template.description.isNotBlank()) {
+                                    Text(
+                                        text = template.description,
+                                        color = TextSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 }

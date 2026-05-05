@@ -17,6 +17,7 @@ import openqwoutt.miniapp.textstyler.presentation.TextStylerAction
 import openqwoutt.miniapp.textstyler.presentation.TextStylerViewModel
 import openqwoutt.miniapp.textstyler.presentation.TextStylerViewModelFactory
 import openqwoutt.miniapp.textstyler.ui.TextStylerScreen
+import openqwoutt.textstyler.data.prompts.PromptRepository
 import openqwoutt.textstyler.data.settings.SettingsRepository
 
 @Composable
@@ -29,11 +30,13 @@ fun TextStylerMiniApp(
 ) {
     val context = LocalContext.current
     val settingsRepository = remember { SettingsRepository(context) }
+    val promptRepository = remember { PromptRepository(context) }
     val initialSettings = remember { settingsRepository.load() }
     val viewModel: TextStylerViewModel = viewModel(
         factory = TextStylerViewModelFactory(
             textProcessorUseCase = TextProcessorUseCase(settings = initialSettings),
-            settingsRepository = settingsRepository
+            settingsRepository = settingsRepository,
+            promptRepository = promptRepository
         )
     )
 

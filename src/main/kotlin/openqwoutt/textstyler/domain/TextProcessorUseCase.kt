@@ -3,6 +3,7 @@ package openqwoutt.miniapp.textstyler.domain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import openqwoutt.textprocessor.app.BuildConfig
+import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AppSettings
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -17,16 +18,33 @@ class TextProcessorUseCase(
 ) {
     private val effectiveBackendUrl = settings?.backendUrl?.takeIf { it.isNotBlank() } ?: backendUrl
 
-    suspend fun processText(inputText: String, mode: StyleMode): TextStylerResult {
+    suspend fun processText(
+        inputText: String,
+        mode: StyleMode,
+        template: PromptTemplate? = null
+    ): TextStylerResult {
         if (inputText.isBlank()) {
             return TextStylerResult.EmptyInput
         }
 
         val cleanedText = cleanText(inputText)
+        val textWithTemplate = applyTemplate(cleanedText, template)
+        
         return runCatching {
-            TextStylerResult.Success(sendToBackend(cleanedText, mode))
+            TextStylerResult.Success(sendToBackend(textWithTemplate, mode))
         }.getOrElse {
             TextStylerResult.OrchestratorFailed
+        }
+    }
+
+    /**
+     * Apply prompt template to text before sending to backend.
+     */
+    private fun applyTemplate(text: String, template: PromptTemplate?): String {
+        return if (template != null) {
+            "${template.template}$text"
+        } else {
+            text
         }
     }
 

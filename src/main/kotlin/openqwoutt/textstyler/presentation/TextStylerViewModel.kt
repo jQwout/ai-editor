@@ -11,6 +11,8 @@ import kotlinx.coroutines.launch
 import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.domain.TextStylerResult
+import openqwoutt.textstyler.data.prompts.PromptRepository
+import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AppSettings
 import openqwoutt.textstyler.data.settings.SettingsRepository
 
@@ -18,6 +20,9 @@ data class TextStylerState(
     val inputText: String = "",
     val initialInputText: String? = null,
     val selectedMode: StyleMode = StyleMode.STYLE,
+    val selectedTemplate: PromptTemplate? = null,
+    val availableTemplates: List<PromptTemplate> = emptyList(),
+    val showTemplates: Boolean = false,
     val result: String? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -43,13 +48,17 @@ sealed class TextStylerAction {
     data object ToggleSettings : TextStylerAction()
     data class SaveSettings(val settings: AppSettings) : TextStylerAction()
     data class ReloadUseCaseWithSettings(val settings: AppSettings) : TextStylerAction()
+    data class SelectTemplate(val template: PromptTemplate?) : TextStylerAction()
+    data object ShowTemplates : TextStylerAction()
+    data object HideTemplates : TextStylerAction()
     data class SetCloseBehavior(val behavior: CloseBehavior) : TextStylerAction()
     data class SetOnResultReady(val callback: (String) -> Unit, val onClose: () -> Unit = {}) : TextStylerAction()
 }
 
 class TextStylerViewModel(
     private var textProcessorUseCase: TextProcessorUseCase,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val promptRepository: PromptRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TextStylerState())
@@ -60,7 +69,8 @@ class TextStylerViewModel(
 
     init {
         val saved = settingsRepository.load()
-        _state.update { it.copy(settings = saved) }
+        val templates = promptRepository.getTemplates()
+        _state.update { it.copy(settings = saved, availableTemplates = templates) }
 
         // Apply initial input text if provided
         _state.value.initialInputText?.let { initialText ->
@@ -101,6 +111,15 @@ class TextStylerViewModel(
             is TextStylerAction.ReloadUseCaseWithSettings -> {
                 textProcessorUseCase = TextProcessorUseCase(settings = action.settings)
             }
+            is TextStylerAction.SelectTemplate -> {
+                _state.update { it.copy(selectedTemplate = action.template) }
+            }
+            is TextStylerAction.ShowTemplates -> {
+                _state.update { it.copy(showTemplates = true) }
+            }
+            is TextStylerAction.HideTemplates -> {
+                _state.update { it.copy(showTemplates = false) }
+            }
             is TextStylerAction.SetCloseBehavior -> {
                 _state.update { it.copy(closeBehavior = action.behavior) }
             }
@@ -124,7 +143,8 @@ class TextStylerViewModel(
             when (
                 val result = textProcessorUseCase.processText(
                     inputText = currentState.inputText,
-                    mode = currentState.selectedMode
+                    mode = currentState.selectedMode,
+                    template = currentState.selectedTemplate
                 )
             ) {
                 is TextStylerResult.Success -> {
@@ -166,12 +186,13 @@ class TextStylerViewModel(
 
 class TextStylerViewModelFactory(
     private val textProcessorUseCase: TextProcessorUseCase,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val promptRepository: PromptRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TextStylerViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return TextStylerViewModel(textProcessorUseCase, settingsRepository) as T
+            return TextStylerViewModel(textProcessorUseCase, settingsRepository, promptRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
