@@ -92,6 +92,8 @@ private val TextSecondary = Color(0xFF8E8E93)
 private val Divider = Color(0xFF2C2C2E)
 private val ErrorBg = Color(0xFF3A2228)
 private val ErrorText = Color(0xFFFFC4CF)
+private val ErrorColor = Color(0xFFF44336)
+private val SuccessColor = Color(0xFF4CAF50)
 
 // Animation durations
 private const val TAB_ANIMATION_DURATION = 200
@@ -165,13 +167,32 @@ fun TextStylerScreen(
                         )
                     }
                 } else {
-                    // Main content
-                    MainContent(
-                        state = state,
-                        onAction = onAction,
-                        onNavigateBack = onNavigateBack,
-                        clipboard = clipboard
-                    )
+                    // History modal
+                    Crossfade(
+                        targetState = state.showHistory,
+                        animationSpec = tween(SETTINGS_ANIMATION_DURATION, easing = FastOutSlowInEasing),
+                        label = "history_crossfade"
+                    ) { showHistory ->
+                        if (showHistory) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.5f))
+                            ) {
+                                HistoryScreen(
+                                    onBack = { onAction(TextStylerAction.HideHistory) }
+                                )
+                            }
+                        } else {
+                            // Main content
+                            MainContent(
+                                state = state,
+                                onAction = onAction,
+                                onNavigateBack = onNavigateBack,
+                                clipboard = clipboard
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -201,7 +222,8 @@ private fun MainContent(
                 state = state,
                 onNavigateBack = onNavigateBack,
                 onOpenSettings = { onAction(TextStylerAction.ToggleSettings) },
-                onOpenTemplates = { onAction(TextStylerAction.ShowTemplates) }
+                onOpenTemplates = { onAction(TextStylerAction.ShowTemplates) },
+                onOpenHistory = { onAction(TextStylerAction.ShowHistory) }
             )
 
             MainModeTabs(state = state, onAction = onAction)
@@ -282,7 +304,8 @@ private fun Header(
     state: TextStylerState,
     onNavigateBack: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenTemplates: () -> Unit
+    onOpenTemplates: () -> Unit,
+    onOpenHistory: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -328,6 +351,14 @@ private fun Header(
             Icon(
                 Icons.Default.Settings,
                 contentDescription = "Settings",
+                tint = TextSecondary
+            )
+        }
+        
+        IconButton(onClick = onOpenHistory, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Default.History,
+                contentDescription = "History",
                 tint = TextSecondary
             )
         }

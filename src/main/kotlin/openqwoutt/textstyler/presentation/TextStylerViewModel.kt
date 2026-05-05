@@ -16,6 +16,7 @@ import openqwoutt.textstyler.data.prompts.PromptCategory
 import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AppSettings
 import openqwoutt.textstyler.data.settings.SettingsRepository
+import openqwoutt.miniapp.textstyler.data.repository.InteractionRepository
 
 data class TextStylerState(
     val inputText: String = "",
@@ -27,6 +28,7 @@ data class TextStylerState(
     val selectedCategory: String? = null,
     val searchQuery: String = "",
     val showTemplates: Boolean = false,
+    val showHistory: Boolean = false,
     val result: String? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -55,6 +57,8 @@ sealed class TextStylerAction {
     data class SelectTemplate(val template: PromptTemplate?) : TextStylerAction()
     data object ShowTemplates : TextStylerAction()
     data object HideTemplates : TextStylerAction()
+    data object ShowHistory : TextStylerAction()
+    data object HideHistory : TextStylerAction()
     data class SelectCategory(val category: String?) : TextStylerAction()
     data class SearchTemplates(val query: String) : TextStylerAction()
     data class SetCloseBehavior(val behavior: CloseBehavior) : TextStylerAction()
@@ -64,7 +68,8 @@ sealed class TextStylerAction {
 class TextStylerViewModel(
     private var textProcessorUseCase: TextProcessorUseCase,
     private val settingsRepository: SettingsRepository,
-    private val promptRepository: PromptRepository
+    private val promptRepository: PromptRepository,
+    private val interactionRepository: InteractionRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TextStylerState())
@@ -127,6 +132,12 @@ class TextStylerViewModel(
             is TextStylerAction.HideTemplates -> {
                 _state.update { it.copy(showTemplates = false) }
             }
+            is TextStylerAction.ShowHistory -> {
+                _state.update { it.copy(showHistory = true) }
+            }
+            is TextStylerAction.HideHistory -> {
+                _state.update { it.copy(showHistory = false) }
+            }
             is TextStylerAction.SelectCategory -> {
                 _state.update { it.copy(selectedCategory = action.category) }
             }
@@ -174,6 +185,13 @@ class TextStylerViewModel(
                             isTextTruncated = currentState.inputText.length > 3000
                         )
                     }
+                    // Save to history
+                    interactionRepository.save(
+                        inputText = currentState.inputText,
+                        outputText = result.result,
+                        mode = currentState.selectedMode.id,
+                        status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.SUCCESS
+                    )
                     // Execute callback and/or close based on closeBehavior
                     when (_state.value.closeBehavior) {
                         CloseBehavior.FinishWithResult -> {
@@ -194,9 +212,18 @@ class TextStylerViewModel(
                     }
                 }
                 TextStylerResult.OrchestratorFailed -> {
+                    val errorMsg = "Could not process this text. Try again."
                     _state.update {
-                        it.copy(isLoading = false, error = "Could not process this text. Try again.")
+                        it.copy(isLoading = false, error = errorMsg)
                     }
+                    // Save error to history
+                    interactionRepository.save(
+                        inputText = currentState.inputText,
+                        outputText = null,
+                        mode = currentState.selectedMode.id,
+                        status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.ERROR,
+                        errorMessage = errorMsg
+                    )
                 }
             }
         }
@@ -206,12 +233,13 @@ class TextStylerViewModel(
 class TextStylerViewModelFactory(
     private val textProcessorUseCase: TextProcessorUseCase,
     private val settingsRepository: SettingsRepository,
-    private val promptRepository: PromptRepository
+    private val promptRepository: PromptRepository,
+    private val interactionRepository: InteractionRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TextStylerViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return TextStylerViewModel(textProcessorUseCase, settingsRepository, promptRepository) as T
+            return TextStylerViewModel(textProcessorUseCase, settingsRepository, promptRepository, interactionRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
