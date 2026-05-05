@@ -45,8 +45,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,6 +69,7 @@ import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.presentation.CloseBehavior
 import openqwoutt.miniapp.textstyler.presentation.TextStylerAction
 import openqwoutt.miniapp.textstyler.presentation.TextStylerState
+import openqwoutt.textstyler.data.settings.AppSettings
 
 // Telegram-style dark palette
 private val Bg = Color(0xFF0F0F0F)
@@ -632,5 +638,139 @@ private fun BottomActions(state: TextStylerState, onApply: () -> Unit) {
                 fontSize = 16.sp
             )
         }
+    }
+}
+
+@Composable
+fun SettingsScreen(
+    settings: AppSettings,
+    onSave: (AppSettings) -> Unit,
+    onBack: () -> Unit
+) {
+    var currentSettings by remember { mutableStateOf(settings) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(Surface)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Settings",
+                    color = TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = TextSecondary
+                    )
+                }
+            }
+
+            // Divider
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(Divider)
+            )
+
+            // Auto-paste setting
+            SettingsToggleRow(
+                title = "Auto-paste from clipboard",
+                checked = currentSettings.autoPaste,
+                onCheckedChange = { currentSettings = currentSettings.copy(autoPaste = it) }
+            )
+
+            // Auto-copy result setting
+            SettingsToggleRow(
+                title = "Auto-copy result",
+                checked = currentSettings.autoCopyResult,
+                onCheckedChange = { currentSettings = currentSettings.copy(autoCopyResult = it) }
+            )
+
+            // Sound effects setting
+            SettingsToggleRow(
+                title = "Sound effects",
+                checked = currentSettings.soundEffects,
+                onCheckedChange = { currentSettings = currentSettings.copy(soundEffects = it) }
+            )
+
+            // Haptic feedback setting
+            SettingsToggleRow(
+                title = "Haptic feedback",
+                checked = currentSettings.hapticFeedback,
+                onCheckedChange = { currentSettings = currentSettings.copy(hapticFeedback = it) }
+            )
+
+            // Save button
+            Button(
+                onClick = { onSave(currentSettings) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Accent
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "Save",
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Bg)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            color = TextPrimary,
+            fontSize = 16.sp
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Accent,
+                uncheckedThumbColor = TextSecondary,
+                uncheckedTrackColor = Surface
+            )
+        )
     }
 }
