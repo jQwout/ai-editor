@@ -2,8 +2,9 @@ plugins {
     id("com.android.application") version "8.13.1"
     id("org.jetbrains.kotlin.android") version "2.2.20"
     id("org.jetbrains.kotlin.plugin.compose") version "2.2.20"
+    id("com.google.devtools.ksp") version "2.2.20-1.0.25"
     id("org.jetbrains.kotlin.jvm") version "2.2.20" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.2.20"
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.2.20" apply false
 }
 
 val backendUrl = providers.gradleProperty("AI_BACKEND_URL")
@@ -62,11 +63,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview:1.6.2")
     implementation("androidx.compose.material:material-icons-extended:1.6.2")
     implementation("androidx.compose.material3:material3:1.2.0")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
-    implementation("io.ktor:ktor-client-android:3.3.1")
-    implementation("io.ktor:ktor-client-content-negotiation:3.3.1")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
-    implementation("io.ktor:ktor-client-logging:3.3.1")
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
