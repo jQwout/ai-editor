@@ -12,6 +12,7 @@ import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.domain.TextStylerResult
 import openqwoutt.textstyler.data.prompts.PromptRepository
+import openqwoutt.textstyler.data.prompts.PromptCategory
 import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AppSettings
 import openqwoutt.textstyler.data.settings.SettingsRepository
@@ -22,6 +23,9 @@ data class TextStylerState(
     val selectedMode: StyleMode = StyleMode.STYLE,
     val selectedTemplate: PromptTemplate? = null,
     val availableTemplates: List<PromptTemplate> = emptyList(),
+    val availableCategories: List<PromptCategory> = emptyList(),
+    val selectedCategory: String? = null,
+    val searchQuery: String = "",
     val showTemplates: Boolean = false,
     val result: String? = null,
     val isLoading: Boolean = false,
@@ -51,6 +55,8 @@ sealed class TextStylerAction {
     data class SelectTemplate(val template: PromptTemplate?) : TextStylerAction()
     data object ShowTemplates : TextStylerAction()
     data object HideTemplates : TextStylerAction()
+    data class SelectCategory(val category: String?) : TextStylerAction()
+    data class SearchTemplates(val query: String) : TextStylerAction()
     data class SetCloseBehavior(val behavior: CloseBehavior) : TextStylerAction()
     data class SetOnResultReady(val callback: (String) -> Unit, val onClose: () -> Unit = {}) : TextStylerAction()
 }
@@ -70,7 +76,8 @@ class TextStylerViewModel(
     init {
         val saved = settingsRepository.load()
         val templates = promptRepository.getTemplates()
-        _state.update { it.copy(settings = saved, availableTemplates = templates) }
+        val categories = promptRepository.getCategories()
+        _state.update { it.copy(settings = saved, availableTemplates = templates, availableCategories = categories) }
 
         // Apply initial input text if provided
         _state.value.initialInputText?.let { initialText ->
@@ -119,6 +126,18 @@ class TextStylerViewModel(
             }
             is TextStylerAction.HideTemplates -> {
                 _state.update { it.copy(showTemplates = false) }
+            }
+            is TextStylerAction.SelectCategory -> {
+                _state.update { it.copy(selectedCategory = action.category) }
+            }
+            is TextStylerAction.SearchTemplates -> {
+                val query = action.query
+                val results = if (query.isBlank()) {
+                    _state.value.availableTemplates
+                } else {
+                    promptRepository.search(query)
+                }
+                _state.update { it.copy(searchQuery = query, availableTemplates = results) }
             }
             is TextStylerAction.SetCloseBehavior -> {
                 _state.update { it.copy(closeBehavior = action.behavior) }

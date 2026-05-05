@@ -42,7 +42,7 @@ class TextProcessorUseCase(
      */
     private fun applyTemplate(text: String, template: PromptTemplate?): String {
         return if (template != null) {
-            "${template.template}$text"
+            "${template.prompt}$text"
         } else {
             text
         }

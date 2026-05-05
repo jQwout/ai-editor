@@ -35,9 +35,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.CopyAll
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Button
@@ -45,11 +47,15 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -138,10 +144,18 @@ fun TextStylerScreen(
                     ) {
                         TemplatesSheet(
                             templates = state.availableTemplates,
+                            categories = state.availableCategories,
+                            selectedCategory = state.selectedCategory,
                             selectedTemplate = state.selectedTemplate,
                             onSelect = { template ->
                                 onAction(TextStylerAction.SelectTemplate(template))
                                 onAction(TextStylerAction.HideTemplates)
+                            },
+                            onSelectCategory = { category ->
+                                onAction(TextStylerAction.SelectCategory(category))
+                            },
+                            onSearch = { query ->
+                                onAction(TextStylerAction.SearchTemplates(query))
                             },
                             onClear = {
                                 onAction(TextStylerAction.SelectTemplate(null))
@@ -829,11 +843,17 @@ private fun SettingsToggleRow(
 @Composable
 fun TemplatesSheet(
     templates: List<PromptTemplate>,
+    categories: List<PromptCategory>,
+    selectedCategory: String?,
     selectedTemplate: PromptTemplate?,
     onSelect: (PromptTemplate) -> Unit,
+    onSelectCategory: (String?) -> Unit,
+    onSearch: (String) -> Unit,
     onClear: () -> Unit,
     onBack: () -> Unit
 ) {
+    var searchText by remember { mutableStateOf("") }
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -867,13 +887,83 @@ fun TemplatesSheet(
                         color = Accent,
                         fontSize = 14.sp
                     )
-                )
+                }
             } else {
                 Spacer(modifier = Modifier.size(48.dp))
             }
         }
 
-        // Templates grouped by category
+        // Search bar
+        OutlinedTextField(
+            value = searchText,
+            onValueChange = { 
+                searchText = it
+                onSearch(it)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            placeholder = { Text("Search templates...", color = TextSecondary) },
+            leadingIcon = {
+                Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary)
+            },
+            trailingIcon = {
+                if (searchText.isNotEmpty()) {
+                    IconButton(onClick = { 
+                        searchText = ""
+                        onSearch("")
+                    }) {
+                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextSecondary)
+                    }
+                }
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Accent,
+                unfocusedBorderColor = Surface,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary
+            ),
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true
+        )
+
+        // Category chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = selectedCategory == null,
+                onClick = { onSelectCategory(null) },
+                label = { Text("All") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Accent,
+                    selectedLabelColor = Color.White
+                )
+            )
+            categories.forEach { cat ->
+                FilterChip(
+                    selected = selectedCategory == cat.id,
+                    onClick = { onSelectCategory(cat.id) },
+                    label = { Text(cat.name) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Accent,
+                        selectedLabelColor = Color.White
+                    )
+                )
+            }
+        }
+
+        // Templates list
+        val filteredTemplates = if (selectedCategory != null) {
+            templates.filter { it.category == selectedCategory }
+        } else {
+            templates
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -881,50 +971,37 @@ fun TemplatesSheet(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val categories = listOf(
-                PromptCategory.TRANSFORM to "Transform",
-                PromptCategory.ANALYSIS to "Analysis",
-                PromptCategory.CREATE to "Create",
-                PromptCategory.FORMAT to "Format"
-            )
-
-            categories.forEach { (category, label) ->
-                val categoryTemplates = templates.filter { it.category == category }
-                if (categoryTemplates.isNotEmpty()) {
-                    Text(
-                        text = label,
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
-                    
-                    categoryTemplates.forEach { template ->
-                        val isSelected = selectedTemplate?.id == template.id
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) AccentSoft else Surface)
-                                .padding(12.dp)
-                                .then(
-                                    Modifier.clickable { onSelect(template) }
-                                )
-                        ) {
-                            Column {
-                                Text(
-                                    text = template.name,
-                                    color = if (isSelected) Accent else TextPrimary,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                if (template.description.isNotBlank()) {
-                                    Text(
-                                        text = template.description,
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
+            filteredTemplates.forEach { template ->
+                val isSelected = selectedTemplate?.id == template.id
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isSelected) AccentSoft else Surface)
+                        .padding(12.dp)
+                        .then(Modifier.clickable { onSelect(template) })
+                ) {
+                    Column {
+                        Text(
+                            text = template.name,
+                            color = if (isSelected) Accent else TextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        if (template.description.isNotBlank()) {
+                            Text(
+                                text = template.description,
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                        if (template.tags.isNotEmpty()) {
+                            Text(
+                                text = template.tags.joinToString(", "),
+                                color = Accent.copy(alpha = 0.7f),
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
                         }
                     }
                 }
