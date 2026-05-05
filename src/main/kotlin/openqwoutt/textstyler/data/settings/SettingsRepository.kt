@@ -36,7 +36,7 @@ class SettingsRepository(context: Context) {
         private const val KEY_MODEL = "model"
         private const val KEY_BACKEND_URL = "backend_url"
 
-        private const val DEFAULT_MODEL = "google/gemini-2.0-flash-exp:free"
+        private const val DEFAULT_MODEL = ""
         private const val DEFAULT_BACKEND_URL = "http://10.0.2.2:8080"
     }
 }

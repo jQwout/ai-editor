@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -49,16 +52,11 @@ private val Accent = Color(0xFF8D78F0)
 private val TextPrimary = Color(0xFFF4F1F8)
 private val TextSecondary = Color(0xFFB9B5C3)
 
-private val FREE_MODELS = listOf(
-    "google/gemini-2.0-flash-exp:free",
-    "deepseek/deepseek-chat:free",
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "nousresearch/hermes-3-llama-3.1-405b:free"
-)
-
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
+    availableModels: List<String>,
+    isLoadingModels: Boolean,
     onSave: (AppSettings) -> Unit,
     onBack: () -> Unit
 ) {
@@ -67,10 +65,10 @@ fun SettingsScreen(
     var model by remember { mutableStateOf(settings.model) }
     var backendUrl by remember { mutableStateOf(settings.backendUrl) }
     var modelExpanded by remember { mutableStateOf(false) }
-    var isCustomModel by remember { mutableStateOf(settings.model !in FREE_MODELS) }
+    var isCustomModel by remember { mutableStateOf(availableModels.isNotEmpty() && settings.model !in availableModels) }
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().systemBarsPadding(),
         color = AppBg
     ) {
         Column(
@@ -168,7 +166,9 @@ fun SettingsScreen(
                                 isCustomModel = custom
                             },
                             expanded = modelExpanded,
-                            onExpandedChange = { modelExpanded = it }
+                            onExpandedChange = { modelExpanded = it },
+                            availableModels = availableModels,
+                            isLoading = isLoadingModels
                         )
                     }
                 }
@@ -204,11 +204,25 @@ private fun ModelDropdown(
     isCustom: Boolean,
     onModelSelected: (String, Boolean) -> Unit,
     expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit
+    onExpandedChange: (Boolean) -> Unit,
+    availableModels: List<String>,
+    isLoading: Boolean
 ) {
     var customText by remember { mutableStateOf(if (isCustom) selectedModel else "") }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (isLoading) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Text("Loading models...", color = TextSecondary)
+            }
+        } else if (availableModels.isEmpty()) {
+            Text("Failed to load models. You can enter a custom model ID.", color = TextSecondary)
+        }
+
         ExposedDropdownMenuBox(
             expanded = expanded,
             onExpandedChange = onExpandedChange
@@ -229,7 +243,7 @@ private fun ModelDropdown(
                 onDismissRequest = { onExpandedChange(false) },
                 modifier = Modifier.background(PanelLight)
             ) {
-                FREE_MODELS.forEach { model ->
+                availableModels.forEach { model ->
                     DropdownMenuItem(
                         text = { Text(model, color = TextPrimary) },
                         onClick = {

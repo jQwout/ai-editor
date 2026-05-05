@@ -1,5 +1,7 @@
 package openqwoutt.miniapp.textstyler
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -31,8 +33,8 @@ fun TextStylerMiniApp(
     val state by viewModel.state.collectAsState()
 
     MaterialTheme(colorScheme = darkColorScheme()) {
-        Scaffold(modifier = Modifier.systemBarsPadding()) {
-            it
+        Scaffold {
+            Box(modifier = Modifier.padding(it))
             TextStylerScreen(
                 state = state,
                 onAction = viewModel::handle,

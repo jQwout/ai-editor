@@ -1,9 +1,12 @@
 package openqwoutt.miniapp.textstyler.domain
 
 enum class ModeGroup {
-    MAIN,
+    /** Summary + deep analyze only */
+    ANALYSIS,
+    /** Base rewrite + tone presets */
     STYLE,
-    ANALYZE
+    /** Grammar / clarity fix */
+    FIX
 }
 
 enum class StyleMode(
@@ -15,29 +18,37 @@ enum class StyleMode(
     val prompt: String,
     val temperature: Double = 0.4
 ) {
-    ANALYZE_MAIN(
+    SUMMARIZE(
+        id = "summarize",
+        displayName = "Summarize",
+        shortName = "Summary",
+        icon = "=",
+        group = ModeGroup.ANALYSIS,
+        prompt = "Create a clear, concise summary of the text. Capture all key information. Use bullets if that helps clarity. Respond in the same language as the input text. Return only the summary."
+    ),
+    ANALYZE(
         id = "analyze",
         displayName = "Analyze",
         shortName = "Analyze",
         icon = "?",
-        group = ModeGroup.MAIN,
-        prompt = "Analyze the text: intent, tone, key points, weak spots, and suggested improvements. Keep it concise."
+        group = ModeGroup.ANALYSIS,
+        prompt = "Analyze the text for: main intent and purpose, tone and emotional register, key points (3-5 bullets max), weak spots and potential issues, suggested improvements. Respond in the same language as the input text. Keep the response concise and actionable."
     ),
     STYLE(
         id = "style",
         displayName = "Clean style",
         shortName = "Style",
         icon = "*",
-        group = ModeGroup.MAIN,
-        prompt = "Rewrite the text to sound polished, clear, and modern while preserving the meaning. Return only the rewritten text."
+        group = ModeGroup.STYLE,
+        prompt = "Rewrite the text to sound polished, clear, and modern. Preserve the original meaning. Respond in the same language as the input text. Return only the rewritten text."
     ),
     FIX(
         id = "fix",
         displayName = "Fix grammar",
         shortName = "Fix",
         icon = "o",
-        group = ModeGroup.MAIN,
-        prompt = "Fix spelling, grammar, punctuation, and clarity. Return only the corrected text without explanations."
+        group = ModeGroup.FIX,
+        prompt = "Fix all spelling, grammar, punctuation, and clarity errors. Preserve the original meaning. Respond in the same language as the input text. Return only the corrected text without explanations."
     ),
     FORMAL(
         id = "style_formal",
@@ -45,7 +56,7 @@ enum class StyleMode(
         shortName = "Formal",
         icon = "F",
         group = ModeGroup.STYLE,
-        prompt = "Rewrite the text in a formal business style. Return only the result."
+        prompt = "Rewrite the text in a formal, professional business style. Be polite and respectful. Respond in the same language as the input text. Return only the result."
     ),
     SHORT(
         id = "style_short",
@@ -53,7 +64,7 @@ enum class StyleMode(
         shortName = "Short",
         icon = "S",
         group = ModeGroup.STYLE,
-        prompt = "Make the text shorter, sharper, and easier to scan. Preserve the key meaning. Return only the result."
+        prompt = "Make the text shorter, sharper, and easier to scan. Preserve the key meaning and all important information. Respond in the same language as the input text. Return only the shortened result."
     ),
     TRIBAL(
         id = "style_tribal",
@@ -61,7 +72,7 @@ enum class StyleMode(
         shortName = "Tribal",
         icon = "T",
         group = ModeGroup.STYLE,
-        prompt = "Rewrite the text with vivid, primal, clan-like energy while keeping it readable and respectful. Return only the result.",
+        prompt = "Rewrite the text with vivid, primal, clan-like energy. Make it sound passionate and collective. Respond in the same language as the input text. Return only the result.",
         temperature = 0.7
     ),
     CORP(
@@ -70,7 +81,7 @@ enum class StyleMode(
         shortName = "Corp",
         icon = "C",
         group = ModeGroup.STYLE,
-        prompt = "Rewrite the text in concise corporate language suitable for work messages. Return only the result."
+        prompt = "Rewrite the text in concise corporate language suitable for work messages. Use clear, direct phrasing. Respond in the same language as the input text. Return only the result."
     ),
     BIBLICAL(
         id = "style_biblical",
@@ -78,7 +89,7 @@ enum class StyleMode(
         shortName = "Biblical",
         icon = "B",
         group = ModeGroup.STYLE,
-        prompt = "Rewrite the text in an elevated biblical cadence without adding religious claims. Return only the result.",
+        prompt = "Rewrite the text in an elevated biblical cadence. Use flowing, timeless phrasing without adding religious claims. Respond in the same language as the input text. Return only the result.",
         temperature = 0.7
     ),
     VIKING(
@@ -87,7 +98,7 @@ enum class StyleMode(
         shortName = "Viking",
         icon = "V",
         group = ModeGroup.STYLE,
-        prompt = "Rewrite the text with bold old-norse saga energy while preserving the meaning. Return only the result.",
+        prompt = "Rewrite the text with bold old-norse saga energy. Use strong, heroic phrasing. Respond in the same language as the input text. Return only the result.",
         temperature = 0.7
     ),
     ZEN(
@@ -96,7 +107,7 @@ enum class StyleMode(
         shortName = "Zen",
         icon = "Z",
         group = ModeGroup.STYLE,
-        prompt = "Rewrite the text in a calm, minimal, grounded tone. Return only the result."
+        prompt = "Rewrite the text in a calm, minimal, grounded tone. Use sparse, peaceful language. Respond in the same language as the input text. Return only the result."
     ),
     OLD_EMOJI(
         id = "style_old_emoji",
@@ -104,16 +115,8 @@ enum class StyleMode(
         shortName = "Emojify",
         icon = ":)",
         group = ModeGroup.STYLE,
-        prompt = "Add fitting old-school emoticons such as T_T, ^_^, :-) without changing the wording. Return only the modified text.",
+        prompt = "Add fitting old-school emoticons like :-) :-/ :-D T_T ^_^ to convey emotion. Do NOT change the words or add new text. Respond in the same language as the input text. Return only the modified text.",
         temperature = 0.6
-    ),
-    SUMMARIZE(
-        id = "summarize",
-        displayName = "Summarize",
-        shortName = "Summary",
-        icon = "=",
-        group = ModeGroup.ANALYZE,
-        prompt = "Summarize the text into the clearest useful version. Use short bullets only if that helps. Return only the summary."
     )
 }
 

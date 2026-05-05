@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package openqwoutt.miniapp.textstyler.ui
 
 import android.content.ClipData
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,9 +33,13 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -65,6 +72,9 @@ private val Divider = Color(0xFF2C2C2E)
 private val ErrorBg = Color(0xFF3A2228)
 private val ErrorText = Color(0xFFFFC4CF)
 
+/** One slot for secondary mode controls so switching Analysis/Style/Fix does not collapse the layout. */
+private val ModeSubpanelHeight = 76.dp
+
 @Composable
 fun TextStylerScreen(
     state: TextStylerState,
@@ -77,6 +87,8 @@ fun TextStylerScreen(
     if (state.showSettings) {
         SettingsScreen(
             settings = state.settings,
+            availableModels = state.availableModels,
+            isLoadingModels = state.isLoadingModels,
             onSave = { onAction(TextStylerAction.SaveSettings(it)) },
             onBack = { onAction(TextStylerAction.ToggleSettings) }
         )
@@ -85,6 +97,7 @@ fun TextStylerScreen(
 
     Box(
         modifier = Modifier
+            .systemBarsPadding()
             .fillMaxSize()
             .background(Bg)
     ) {
@@ -92,54 +105,57 @@ fun TextStylerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Header(
-                onNavigateBack = onNavigateBack,
-                onOpenSettings = { onAction(TextStylerAction.ToggleSettings) }
-            )
-
-            MainModeTabs(state = state, onAction = onAction)
-
-            if (state.selectedMode == StyleMode.STYLE) {
-                StyleStrip(state = state, onAction = onAction)
-            }
-
-            if (state.selectedMode == StyleMode.ANALYZE_MAIN) {
-                AnalyzeStrip(state = state, onAction = onAction)
-            }
-
-            EditorBlock(
-                state = state,
-                onAction = onAction,
-                clipboard = clipboard
-            )
-
-            if (state.result != null || state.isLoading) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(Divider)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Header(
+                    onNavigateBack = onNavigateBack,
+                    onOpenSettings = { onAction(TextStylerAction.ToggleSettings) }
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                ResultBlock(
+                MainModeTabs(state = state, onAction = onAction)
+                ModeSubControls(state = state, onAction = onAction)
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                EditorBlock(
                     state = state,
-                    clipboard = clipboard,
-                    onAction = onAction
+                    onAction = onAction,
+                    clipboard = clipboard
                 )
+
+                if (state.result != null || state.isLoading) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Divider)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ResultBlock(
+                        state = state,
+                        clipboard = clipboard,
+                        onAction = onAction
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                BottomActions(
+                    state = state,
+                    onApply = { onAction(TextStylerAction.ProcessText) }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            BottomActions(
-                state = state,
-                onApply = { onAction(TextStylerAction.ProcessText) }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -179,41 +195,84 @@ private fun Header(
     }
 }
 
+private val mainCategoryModes = listOf(
+    ModeGroup.ANALYSIS to "Analysis",
+    ModeGroup.STYLE to "Style",
+    ModeGroup.FIX to "Fix"
+)
+
 @Composable
 private fun MainModeTabs(state: TextStylerState, onAction: (TextStylerAction) -> Unit) {
-    Row(
+    val selectedIndex = mainCategoryModes.indexOfFirst { it.first == state.selectedMode.group }
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(Surface)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(4.dp)
     ) {
-        StyleMode.entries.filter { it.group == ModeGroup.MAIN }.forEach { mode ->
-            val selected = state.selectedMode == mode
-            val bg = if (selected) Accent else Color.Transparent
-            val textColor = if (selected) Color.White else TextSecondary
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(bg)
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                TextButton(
-                    onClick = { onAction(TextStylerAction.SelectMode(mode)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(0.dp)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            mainCategoryModes.forEachIndexed { index, (group, label) ->
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(
+                        index = index,
+                        count = mainCategoryModes.size
+                    ),
+                    onClick = {
+                        when (group) {
+                            ModeGroup.ANALYSIS -> {
+                                if (state.selectedMode.group != ModeGroup.ANALYSIS) {
+                                    onAction(TextStylerAction.SelectMode(StyleMode.ANALYZE))
+                                }
+                            }
+                            ModeGroup.STYLE -> {
+                                if (state.selectedMode.group != ModeGroup.STYLE) {
+                                    onAction(TextStylerAction.SelectMode(StyleMode.STYLE))
+                                }
+                            }
+                            ModeGroup.FIX -> onAction(TextStylerAction.SelectMode(StyleMode.FIX))
+                        }
+                    },
+                    selected = index == selectedIndex,
+                    modifier = Modifier.weight(1f),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = Accent,
+                        activeContentColor = Color.White,
+                        activeBorderColor = Accent,
+                        inactiveContainerColor = Color.Transparent,
+                        inactiveContentColor = TextSecondary,
+                        inactiveBorderColor = Divider
+                    )
                 ) {
                     Text(
-                        text = mode.shortName,
-                        color = textColor,
+                        text = label,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModeSubControls(state: TextStylerState, onAction: (TextStylerAction) -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(ModeSubpanelHeight),
+        contentAlignment = Alignment.Center
+    ) {
+        when (state.selectedMode.group) {
+            ModeGroup.ANALYSIS -> AnalyzeStrip(state = state, onAction = onAction)
+            ModeGroup.STYLE -> StyleStrip(state = state, onAction = onAction)
+            ModeGroup.FIX -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Surface)
+                )
             }
         }
     }
@@ -228,7 +287,7 @@ private fun StyleStrip(state: TextStylerState, onAction: (TextStylerAction) -> U
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         StyleMode.entries.filter { it.group == ModeGroup.STYLE }.forEach { mode ->
-            val selected = state.selectedMode == mode
+            val selected = state.selectedStyle == mode
             val bg = if (selected) AccentSoft else Color.Transparent
             val textColor = if (selected) Accent else TextSecondary
 
@@ -261,37 +320,39 @@ private fun StyleStrip(state: TextStylerState, onAction: (TextStylerAction) -> U
     }
 }
 
+private val analysisSubModes = listOf(StyleMode.SUMMARIZE, StyleMode.ANALYZE)
+
 @Composable
 private fun AnalyzeStrip(state: TextStylerState, onAction: (TextStylerAction) -> Unit) {
-    Row(
+    val selectedIndex = analysisSubModes.indexOf(state.selectedMode).coerceAtLeast(0)
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(Surface)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(4.dp)
     ) {
-        StyleMode.entries.filter { it.group == ModeGroup.ANALYZE || it == StyleMode.ANALYZE_MAIN }.forEach { mode ->
-            val selected = state.selectedMode == mode
-            val bg = if (selected) Accent else Color.Transparent
-            val textColor = if (selected) Color.White else TextSecondary
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(bg)
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                TextButton(
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            analysisSubModes.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(
+                        index = index,
+                        count = analysisSubModes.size
+                    ),
                     onClick = { onAction(TextStylerAction.SelectMode(mode)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(0.dp)
+                    selected = index == selectedIndex,
+                    modifier = Modifier.weight(1f),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = Accent,
+                        activeContentColor = Color.White,
+                        activeBorderColor = Accent,
+                        inactiveContainerColor = Color.Transparent,
+                        inactiveContentColor = TextSecondary,
+                        inactiveBorderColor = Divider
+                    )
                 ) {
                     Text(
                         text = mode.shortName,
-                        color = textColor,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
                     )
