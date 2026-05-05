@@ -128,7 +128,10 @@ fun HistoryScreen(
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(state.items) { interaction ->
+                items(
+                    items = state.items,
+                    key = { it.id }
+                ) { interaction ->
                     InteractionItem(
                         interaction = interaction,
                         onDelete = { viewModel.delete(interaction.id) }

@@ -3,8 +3,11 @@ package openqwoutt.miniapp.textstyler.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -17,6 +20,14 @@ import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AppSettings
 import openqwoutt.textstyler.data.settings.SettingsRepository
 import openqwoutt.miniapp.textstyler.data.repository.InteractionRepository
+
+/**
+ * One-shot events from ViewModel to UI.
+ */
+sealed class MiniAppEvent {
+    data class ResultReady(val result: String) : MiniAppEvent()
+    data object NavigateBack : MiniAppEvent()
+}
 
 data class TextStylerState(
     val inputText: String = "",
@@ -74,9 +85,10 @@ class TextStylerViewModel(
 
     private val _state = MutableStateFlow(TextStylerState())
     val state: StateFlow<TextStylerState> = _state.asStateFlow()
-
-    private var onResultReady: ((String) -> Unit)? = null
-    private var onClose: (() -> Unit)? = null
+    
+    // SharedFlow for one-shot events (avoid storing callbacks in ViewModel)
+    private val _events = MutableSharedFlow<MiniAppEvent>()
+    val events: SharedFlow<MiniAppEvent> = _events.asSharedFlow()
 
     init {
         val saved = settingsRepository.load()
@@ -154,8 +166,8 @@ class TextStylerViewModel(
                 _state.update { it.copy(closeBehavior = action.behavior) }
             }
             is TextStylerAction.SetOnResultReady -> {
-                onResultReady = action.callback
-                onClose = action.onClose
+                // We don't store callbacks in ViewModel anymore
+                // UI collects events from SharedFlow
             }
         }
     }
@@ -185,21 +197,23 @@ class TextStylerViewModel(
                             isTextTruncated = currentState.inputText.length > 3000
                         )
                     }
-                    // Save to history
-                    interactionRepository.save(
-                        inputText = currentState.inputText,
-                        outputText = result.result,
-                        mode = currentState.selectedMode.id,
-                        status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.SUCCESS
-                    )
-                    // Execute callback and/or close based on closeBehavior
+                    // Save to history (opt-out)
+                    if (currentState.settings.saveHistory) {
+                        interactionRepository.save(
+                            inputText = currentState.inputText,
+                            outputText = result.result,
+                            mode = currentState.selectedMode.id,
+                            status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.SUCCESS
+                        )
+                    }
+                    // Emit event for UI to handle callbacks
                     when (_state.value.closeBehavior) {
                         CloseBehavior.FinishWithResult -> {
-                            onResultReady?.invoke(result.result)
-                            onClose?.invoke()
+                            _events.emit(MiniAppEvent.ResultReady(result.result))
+                            _events.emit(MiniAppEvent.NavigateBack)
                         }
                         CloseBehavior.CopyToClipboard -> {
-                            onResultReady?.invoke(result.result)
+                            _events.emit(MiniAppEvent.ResultReady(result.result))
                         }
                         CloseBehavior.NavigateBack, CloseBehavior.FinishActivity -> {
                             // Do nothing extra, just show result

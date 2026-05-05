@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 
 /**
  * Data Access Object for interaction history.
@@ -26,6 +27,24 @@ interface InteractionDao {
     @Query("SELECT COUNT(*) FROM interaction_history")
     suspend fun count(): Int
 
-    @Query("DELETE FROM interaction_history WHERE id IN (SELECT id FROM interaction_history ORDER BY timestamp DESC LIMIT -1 OFFSET :keep)")
+    @Query("""
+        DELETE FROM interaction_history 
+        WHERE id NOT IN (
+            SELECT id FROM interaction_history 
+            ORDER BY timestamp DESC 
+            LIMIT :keep
+        )
+    """)
     suspend fun deleteOldest(keep: Int)
+
+    /**
+     * Insert and enforce limit in a single transaction.
+     */
+    @Transaction
+    suspend fun insertWithLimit(entity: InteractionEntity, maxItems: Int) {
+        insert(entity)
+        if (count() > maxItems) {
+            deleteOldest(maxItems)
+        }
+    }
 }

@@ -11,7 +11,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [InteractionEntity::class],
     version = 1,
-    exportSchema = false
+    exportSchema = true  // Enable for migrations
 )
 abstract class AppDatabase : RoomDatabase() {
 

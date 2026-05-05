@@ -9,5 +9,6 @@ data class AppSettings(
     val autoPaste: Boolean = true,
     val autoCopyResult: Boolean = true,
     val soundEffects: Boolean = false,
-    val hapticFeedback: Boolean = true
+    val hapticFeedback: Boolean = true,
+    val saveHistory: Boolean = true  // Opt-out for history storage
 )

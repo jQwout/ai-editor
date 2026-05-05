@@ -22,7 +22,7 @@ class InteractionRepository(context: Context) {
     }
 
     /**
-     * Save a new interaction.
+     * Save a new interaction (transactional).
      */
     suspend fun save(
         inputText: String,
@@ -31,24 +31,18 @@ class InteractionRepository(context: Context) {
         status: InteractionStatus,
         errorMessage: String? = null
     ) {
-        val id = System.currentTimeMillis() + Random.nextInt(1000)
-        dao.insert(
+        // Let Room auto-generate ID
+        dao.insertWithLimit(
             InteractionEntity(
-                id = id,
                 timestamp = System.currentTimeMillis(),
                 inputText = inputText,
                 outputText = outputText,
                 mode = mode,
                 status = status.name,
                 errorMessage = errorMessage
-            )
+            ),
+            MAX_ITEMS
         )
-        
-        // Enforce max limit
-        val count = dao.count()
-        if (count > MAX_ITEMS) {
-            dao.deleteOldest(count - MAX_ITEMS)
-        }
     }
 
     /**
