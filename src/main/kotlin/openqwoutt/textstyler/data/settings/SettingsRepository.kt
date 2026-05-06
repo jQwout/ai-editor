@@ -19,7 +19,11 @@ class SettingsRepository(context: Context) {
             autoPaste = prefs.getBoolean(KEY_AUTO_PASTE, AppSettings().autoPaste),
             autoCopyResult = prefs.getBoolean(KEY_AUTO_COPY, AppSettings().autoCopyResult),
             soundEffects = prefs.getBoolean(KEY_SOUND, AppSettings().soundEffects),
-            hapticFeedback = prefs.getBoolean(KEY_HAPTIC, AppSettings().hapticFeedback)
+            hapticFeedback = prefs.getBoolean(KEY_HAPTIC, AppSettings().hapticFeedback),
+            aiProvider = prefs.getString(KEY_AI_PROVIDER, AppSettings().aiProvider)
+                ?: AppSettings().aiProvider,
+            apiKey = prefs.getString(KEY_API_KEY, AppSettings().apiKey)
+                ?: AppSettings().apiKey
         )
     }
 
@@ -31,6 +35,8 @@ class SettingsRepository(context: Context) {
             putBoolean(KEY_AUTO_COPY, settings.autoCopyResult)
             putBoolean(KEY_SOUND, settings.soundEffects)
             putBoolean(KEY_HAPTIC, settings.hapticFeedback)
+            putString(KEY_AI_PROVIDER, settings.aiProvider)
+            putString(KEY_API_KEY, settings.apiKey)
             apply()
         }
     }
@@ -43,5 +49,7 @@ class SettingsRepository(context: Context) {
         private const val KEY_AUTO_COPY = "auto_copy"
         private const val KEY_SOUND = "sound_effects"
         private const val KEY_HAPTIC = "haptic_feedback"
+        private const val KEY_AI_PROVIDER = "ai_provider"
+        private const val KEY_API_KEY = "api_key"
     }
 }
