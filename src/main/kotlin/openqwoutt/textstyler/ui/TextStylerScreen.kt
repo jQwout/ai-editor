@@ -78,8 +78,8 @@ import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.presentation.CloseBehavior
 import openqwoutt.miniapp.textstyler.presentation.TextStylerAction
 import openqwoutt.miniapp.textstyler.presentation.TextStylerState
-import openqwoutt.textstyler.data.prompts.PromptCategory
-import openqwoutt.textstyler.data.prompts.PromptTemplate
+import openqwoutt.miniapp.textstyler.data.prompts.PromptCategory
+import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AppSettings
 
 // Telegram-style dark palette
