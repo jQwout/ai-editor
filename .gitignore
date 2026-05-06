@@ -29,6 +29,10 @@ Thumbs.db
 *.swp
 *~
 
+# Local CLI tools and binaries
+~/.local/bin/
+~/.uv/
+
 # Keystore files (security)
 *.jks
 *.keystore
