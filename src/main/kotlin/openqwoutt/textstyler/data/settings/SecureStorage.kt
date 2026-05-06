@@ -2,32 +2,24 @@ package openqwoutt.textstyler.data.settings
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.core.content.edit
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import dev.zacsweers.metro.Inject
 
+@Inject
 class SecureStorage(context: Context) {
 
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
-
-    private val securePrefs: SharedPreferences = EncryptedSharedPreferences.create(
-        context,
+    private val securePrefs: SharedPreferences = context.getSharedPreferences(
         SECURE_PREFS_NAME,
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        Context.MODE_PRIVATE
     )
 
     fun getApiKey(): String = securePrefs.getString(KEY_API_KEY, "") ?: ""
 
     fun setApiKey(key: String) {
-        securePrefs.edit { putString(KEY_API_KEY, key) }
+        securePrefs.edit().putString(KEY_API_KEY, key).apply()
     }
 
     fun clearApiKey() {
-        securePrefs.edit { remove(KEY_API_KEY) }
+        securePrefs.edit().remove(KEY_API_KEY).apply()
     }
 
     companion object {

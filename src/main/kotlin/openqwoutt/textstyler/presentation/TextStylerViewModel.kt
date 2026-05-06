@@ -1,7 +1,6 @@
 package openqwoutt.miniapp.textstyler.presentation
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,12 +10,12 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import openqwoutt.miniapp.textstyler.data.prompts.PromptCategory
+import openqwoutt.miniapp.textstyler.data.prompts.PromptRepository
+import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
 import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.domain.TextStylerResult
-import openqwoutt.textstyler.data.prompts.PromptRepository
-import openqwoutt.textstyler.data.prompts.PromptCategory
-import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AppSettings
 import openqwoutt.textstyler.data.settings.SettingsRepository
 import openqwoutt.miniapp.textstyler.data.repository.InteractionRepository
@@ -40,6 +39,7 @@ data class TextStylerState(
     val searchQuery: String = "",
     val showTemplates: Boolean = false,
     val showHistory: Boolean = false,
+    val showModePicker: Boolean = false,
     val result: String? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -70,6 +70,9 @@ sealed class TextStylerAction {
     data object HideTemplates : TextStylerAction()
     data object ShowHistory : TextStylerAction()
     data object HideHistory : TextStylerAction()
+    data object ToggleModePicker : TextStylerAction()
+    data object ShowModePicker : TextStylerAction()
+    data object HideModePicker : TextStylerAction()
     data class SelectCategory(val category: String?) : TextStylerAction()
     data class SearchTemplates(val query: String) : TextStylerAction()
     data class SetCloseBehavior(val behavior: CloseBehavior) : TextStylerAction()
@@ -149,6 +152,15 @@ class TextStylerViewModel(
             }
             is TextStylerAction.HideHistory -> {
                 _state.update { it.copy(showHistory = false) }
+            }
+            is TextStylerAction.ToggleModePicker -> {
+                _state.update { it.copy(showModePicker = !it.showModePicker) }
+            }
+            is TextStylerAction.ShowModePicker -> {
+                _state.update { it.copy(showModePicker = true) }
+            }
+            is TextStylerAction.HideModePicker -> {
+                _state.update { it.copy(showModePicker = false) }
             }
             is TextStylerAction.SelectCategory -> {
                 _state.update { it.copy(selectedCategory = action.category) }
@@ -241,20 +253,5 @@ class TextStylerViewModel(
                 }
             }
         }
-    }
-}
-
-class TextStylerViewModelFactory(
-    private val textProcessorUseCase: TextProcessorUseCase,
-    private val settingsRepository: SettingsRepository,
-    private val promptRepository: PromptRepository,
-    private val interactionRepository: InteractionRepository
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(TextStylerViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return TextStylerViewModel(textProcessorUseCase, settingsRepository, promptRepository, interactionRepository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

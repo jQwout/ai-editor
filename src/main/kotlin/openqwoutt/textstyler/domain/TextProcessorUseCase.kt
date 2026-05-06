@@ -1,9 +1,10 @@
 package openqwoutt.miniapp.textstyler.domain
 
+import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textprocessor.app.BuildConfig
-import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AppSettings
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -11,6 +12,7 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
+@Inject
 class TextProcessorUseCase(
     private val maxChars: Int = 3000,
     private val backendUrl: String = BuildConfig.AI_BACKEND_URL,
