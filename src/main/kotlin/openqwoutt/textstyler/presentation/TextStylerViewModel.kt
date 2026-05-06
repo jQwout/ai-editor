@@ -18,6 +18,7 @@ import openqwoutt.textstyler.data.prompts.PromptRepository
 import openqwoutt.textstyler.data.prompts.PromptCategory
 import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AppSettings
+import openqwoutt.textstyler.data.settings.OpenRouterModelsCache
 import openqwoutt.textstyler.data.settings.SettingsRepository
 import openqwoutt.miniapp.textstyler.data.repository.InteractionRepository
 
@@ -46,7 +47,9 @@ data class TextStylerState(
     val isTextTruncated: Boolean = false,
     val showSettings: Boolean = false,
     val settings: AppSettings = AppSettings(),
-    val closeBehavior: CloseBehavior = CloseBehavior.NavigateBack
+    val closeBehavior: CloseBehavior = CloseBehavior.NavigateBack,
+    val availableModels: List<String> = emptyList(),
+    val isLoadingModels: Boolean = false
 )
 
 enum class CloseBehavior {
@@ -95,6 +98,9 @@ class TextStylerViewModel(
         val templates = promptRepository.getTemplates()
         val categories = promptRepository.getCategories()
         _state.update { it.copy(settings = saved, availableTemplates = templates, availableCategories = categories) }
+
+        // Sync available models from OpenRouterModelsCache
+        _state.update { it.copy(availableModels = OpenRouterModelsCache.models.value, isLoadingModels = OpenRouterModelsCache.isLoading.value) }
 
         // Apply initial input text if provided
         _state.value.initialInputText?.let { initialText ->

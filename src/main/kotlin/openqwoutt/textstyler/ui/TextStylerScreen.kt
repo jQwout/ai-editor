@@ -127,6 +127,8 @@ fun TextStylerScreen(
             ) {
                 SettingsScreen(
                     settings = state.settings,
+                    availableModels = state.availableModels,
+                    isLoadingModels = state.isLoadingModels,
                     onSave = { onAction(TextStylerAction.SaveSettings(it)) },
                     onBack = { onAction(TextStylerAction.ToggleSettings) }
                 )
@@ -733,107 +735,6 @@ private fun BottomActions(state: TextStylerState, onApply: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 16.sp
             )
-        }
-    }
-}
-
-@Composable
-fun SettingsScreen(
-    settings: AppSettings,
-    onSave: (AppSettings) -> Unit,
-    onBack: () -> Unit
-) {
-    var currentSettings by remember { mutableStateOf(settings) }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(Surface)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Settings",
-                    color = TextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = TextSecondary
-                    )
-                }
-            }
-
-            // Divider
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(Divider)
-            )
-
-            // Auto-paste setting
-            SettingsToggleRow(
-                title = "Auto-paste from clipboard",
-                checked = currentSettings.autoPaste,
-                onCheckedChange = { currentSettings = currentSettings.copy(autoPaste = it) }
-            )
-
-            // Auto-copy result setting
-            SettingsToggleRow(
-                title = "Auto-copy result",
-                checked = currentSettings.autoCopyResult,
-                onCheckedChange = { currentSettings = currentSettings.copy(autoCopyResult = it) }
-            )
-
-            // Sound effects setting
-            SettingsToggleRow(
-                title = "Sound effects",
-                checked = currentSettings.soundEffects,
-                onCheckedChange = { currentSettings = currentSettings.copy(soundEffects = it) }
-            )
-
-            // Haptic feedback setting
-            SettingsToggleRow(
-                title = "Haptic feedback",
-                checked = currentSettings.hapticFeedback,
-                onCheckedChange = { currentSettings = currentSettings.copy(hapticFeedback = it) }
-            )
-
-            // Save button
-            Button(
-                onClick = { onSave(currentSettings) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Accent
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(
-                    text = "Save",
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp
-                )
-            }
         }
     }
 }

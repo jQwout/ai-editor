@@ -23,9 +23,9 @@ object OpenRouterModelsCache {
             .onSuccess { modelList ->
                 _models.value = modelList
                 val settings = settingsRepository.load()
-                if (modelList.isNotEmpty() && (settings.model.isEmpty() || settings.model !in modelList)) {
+                if (modelList.isNotEmpty() && (settings.aiModel.isEmpty() || settings.aiModel !in modelList)) {
                     val first = modelList.first()
-                    settingsRepository.save(settings.copy(model = first))
+                    settingsRepository.save(settings.copy(aiModel = first))
                     Log.d(TAG, "Auto-selected first free model: $first")
                 }
             }

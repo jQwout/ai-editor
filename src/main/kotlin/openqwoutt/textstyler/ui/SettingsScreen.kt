@@ -29,7 +29,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,7 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import openqwoutt.textstyler.data.settings.ApiMode
+import openqwoutt.textstyler.data.settings.AiProvider
 import openqwoutt.textstyler.data.settings.AppSettings
 
 private val AppBg = Color(0xFF0D0D11)
@@ -52,20 +51,25 @@ private val Accent = Color(0xFF8D78F0)
 private val TextPrimary = Color(0xFFF4F1F8)
 private val TextSecondary = Color(0xFFB9B5C3)
 
+private val AiProvider.displayName_: String
+    get() = displayName
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
-    availableModels: List<String>,
-    isLoadingModels: Boolean,
+    availableModels: List<String> = emptyList(),
+    isLoadingModels: Boolean = false,
     onSave: (AppSettings) -> Unit,
     onBack: () -> Unit
 ) {
-    var mode by remember { mutableStateOf(settings.mode) }
+    val currentProvider = settings.toAiProvider()
+    var selectedProvider by remember { mutableStateOf(currentProvider) }
     var apiKey by remember { mutableStateOf(settings.apiKey) }
-    var model by remember { mutableStateOf(settings.model) }
+    var aiModel by remember { mutableStateOf(settings.aiModel) }
     var backendUrl by remember { mutableStateOf(settings.backendUrl) }
+    var providerExpanded by remember { mutableStateOf(false) }
     var modelExpanded by remember { mutableStateOf(false) }
-    var isCustomModel by remember { mutableStateOf(availableModels.isNotEmpty() && settings.model !in availableModels) }
+    var isCustomModel by remember { mutableStateOf(settings.aiModel.isNotBlank() && settings.aiModel !in availableModels) }
 
     Surface(
         modifier = Modifier.fillMaxSize().systemBarsPadding(),
@@ -108,50 +112,56 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = "API Mode",
+                        text = "AI Provider",
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    ExposedDropdownMenuBox(
+                        expanded = providerExpanded,
+                        onExpandedChange = { providerExpanded = it }
                     ) {
-                        Text(
-                            text = if (mode == ApiMode.LOCAL_BACKEND) "Local Backend" else "OpenRouter Direct",
-                            color = TextSecondary
-                        )
-                        Switch(
-                            checked = mode == ApiMode.OPENROUTER_DIRECT,
-                            onCheckedChange = {
-                                mode = if (it) ApiMode.OPENROUTER_DIRECT else ApiMode.LOCAL_BACKEND
-                            }
-                        )
-                    }
-
-                    if (mode == ApiMode.LOCAL_BACKEND) {
                         OutlinedTextField(
-                            value = backendUrl,
-                            onValueChange = { backendUrl = it },
-                            label = { Text("Backend URL") },
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
-                            singleLine = true
+                            value = selectedProvider.displayName_,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Select provider") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = providerExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary)
                         )
+                        ExposedDropdownMenu(
+                            expanded = providerExpanded,
+                            onDismissRequest = { providerExpanded = false },
+                            modifier = Modifier.background(PanelLight)
+                        ) {
+                            AiProvider.entries.forEach { provider ->
+                                DropdownMenuItem(
+                                    text = { Text(provider.displayName_, color = TextPrimary) },
+                                    onClick = {
+                                        selectedProvider = provider
+                                        providerExpanded = false
+                                    }
+                                )
+                            }
+                        }
                     }
 
-                    if (mode == ApiMode.OPENROUTER_DIRECT) {
+                    if (selectedProvider.requiresApiKey) {
                         OutlinedTextField(
                             value = apiKey,
                             onValueChange = { apiKey = it },
-                            label = { Text("OpenRouter API Key") },
+                            label = { Text("${selectedProvider.displayName_} API Key") },
                             modifier = Modifier.fillMaxWidth(),
                             textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation()
                         )
+                    }
 
+                    if (selectedProvider == AiProvider.OPEN_ROUTER || selectedProvider == AiProvider.GROQ) {
                         Text(
                             text = "Model",
                             color = TextPrimary,
@@ -159,16 +169,28 @@ fun SettingsScreen(
                         )
 
                         ModelDropdown(
-                            selectedModel = model,
+                            selectedModel = aiModel,
                             isCustom = isCustomModel,
                             onModelSelected = { selected, custom ->
-                                model = selected
+                                aiModel = selected
                                 isCustomModel = custom
                             },
                             expanded = modelExpanded,
                             onExpandedChange = { modelExpanded = it },
                             availableModels = availableModels,
-                            isLoading = isLoadingModels
+                            isLoading = isLoadingModels,
+                            defaultModel = selectedProvider.model
+                        )
+                    }
+
+                    if (selectedProvider == AiProvider.OPEN_ROUTER) {
+                        OutlinedTextField(
+                            value = backendUrl,
+                            onValueChange = { backendUrl = it },
+                            label = { Text("Custom Backend URL (optional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
+                            singleLine = true
                         )
                     }
                 }
@@ -177,11 +199,11 @@ fun SettingsScreen(
             Button(
                 onClick = {
                     onSave(
-                        AppSettings(
-                            mode = mode,
-                            apiKey = apiKey.trim(),
-                            model = model.trim(),
-                            backendUrl = backendUrl.trim()
+                        settings.copy(
+                            backendUrl = backendUrl.trim(),
+                            aiProvider = selectedProvider.name,
+                            aiModel = aiModel.trim(),
+                            apiKey = apiKey.trim()
                         )
                     )
                 },
@@ -206,7 +228,8 @@ private fun ModelDropdown(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     availableModels: List<String>,
-    isLoading: Boolean
+    isLoading: Boolean,
+    defaultModel: String
 ) {
     var customText by remember { mutableStateOf(if (isCustom) selectedModel else "") }
 
@@ -220,7 +243,7 @@ private fun ModelDropdown(
                 Text("Loading models...", color = TextSecondary)
             }
         } else if (availableModels.isEmpty()) {
-            Text("Failed to load models. You can enter a custom model ID.", color = TextSecondary)
+            Text("Using default model: $defaultModel", color = TextSecondary)
         }
 
         ExposedDropdownMenuBox(
@@ -228,7 +251,7 @@ private fun ModelDropdown(
             onExpandedChange = onExpandedChange
         ) {
             OutlinedTextField(
-                value = if (isCustom) "Custom" else selectedModel,
+                value = if (isCustom) "Custom" else (selectedModel.ifBlank { defaultModel }),
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("Select model") },

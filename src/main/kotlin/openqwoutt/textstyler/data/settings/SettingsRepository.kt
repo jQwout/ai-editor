@@ -22,6 +22,8 @@ class SettingsRepository(context: Context) {
             hapticFeedback = prefs.getBoolean(KEY_HAPTIC, AppSettings().hapticFeedback),
             aiProvider = prefs.getString(KEY_AI_PROVIDER, AppSettings().aiProvider)
                 ?: AppSettings().aiProvider,
+            aiModel = prefs.getString(KEY_AI_MODEL, AppSettings().aiModel)
+                ?: AppSettings().aiModel,
             apiKey = prefs.getString(KEY_API_KEY, AppSettings().apiKey)
                 ?: AppSettings().apiKey
         )
@@ -36,6 +38,7 @@ class SettingsRepository(context: Context) {
             putBoolean(KEY_SOUND, settings.soundEffects)
             putBoolean(KEY_HAPTIC, settings.hapticFeedback)
             putString(KEY_AI_PROVIDER, settings.aiProvider)
+            putString(KEY_AI_MODEL, settings.aiModel)
             putString(KEY_API_KEY, settings.apiKey)
             apply()
         }
@@ -50,6 +53,7 @@ class SettingsRepository(context: Context) {
         private const val KEY_SOUND = "sound_effects"
         private const val KEY_HAPTIC = "haptic_feedback"
         private const val KEY_AI_PROVIDER = "ai_provider"
+        private const val KEY_AI_MODEL = "ai_model"
         private const val KEY_API_KEY = "api_key"
     }
 }

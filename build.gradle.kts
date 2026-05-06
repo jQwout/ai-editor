@@ -58,7 +58,15 @@ android {
     }
 }
 
+val ktorVersion = "3.3.1"
+
 dependencies {
+    // Ktor Client for network requests
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+
     // Metro DI (version 0.3.8 compatible with Kotlin 2.1)
     implementation("dev.zacsweers.metro:runtime:0.3.8")
     

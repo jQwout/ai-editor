@@ -59,7 +59,12 @@ data class AppSettings(
     val soundEffects: Boolean = false,
     val hapticFeedback: Boolean = true,
     val aiProvider: String = AiProvider.OPEN_ROUTER.name,
+    val aiModel: String = "",
     val apiKey: String = ""
 ) {
     fun toAiProvider(): AiProvider = AiProvider.fromString(aiProvider)
+    
+    fun effectiveModel(): String {
+        return aiModel.takeIf { it.isNotBlank() } ?: toAiProvider().model
+    }
 }
