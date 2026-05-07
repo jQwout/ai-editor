@@ -2,12 +2,14 @@ package openqwoutt.miniapp.textstyler.data.prompts
 
 import android.content.Context
 import android.content.SharedPreferences
+import dev.zacsweers.metro.Inject
 import org.json.JSONObject
 
 /**
  * Repository for AI prompt templates.
  * Loads from assets/prompts.json or falls back to hardcoded defaults.
  */
+@Inject
 class PromptRepository(private val context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -15,7 +17,7 @@ class PromptRepository(private val context: Context) {
     /**
      * Get all available prompt templates.
      */
-    fun getTemplates(): List<PromptTemplate> = loadFromJson().ifEmpty { DEFAULT_PROMPTS }
+    fun getTemplates(): List<PromptTemplate> = loadFromJson().ifEmpty { defaultPrompts }
 
     /**
      * Get templates by category.
@@ -90,6 +92,33 @@ class PromptRepository(private val context: Context) {
 
     companion object {
         private const val PREFS_NAME = "prompt_templates"
+
+        private val defaultPrompts = listOf(
+            PromptTemplate(
+                id = "summarize",
+                name = "Summarize",
+                prompt = "Create a clear, concise summary of the text. Capture all key information. Use bullets if that helps clarity. Respond in the same language as the input text. Return only the summary.",
+                category = "text",
+                description = "Summarize any text",
+                tags = listOf("summary", "text")
+            ),
+            PromptTemplate(
+                id = "translate_en",
+                name = "Translate to English",
+                prompt = "Translate the text to English. Preserve the original meaning and tone. Return only the translated text.",
+                category = "text",
+                description = "Translate to English",
+                tags = listOf("translate", "english")
+            ),
+            PromptTemplate(
+                id = "translate_ru",
+                name = "Translate to Russian",
+                prompt = "Translate the text to Russian. Preserve the original meaning and tone. Return only the translated text.",
+                category = "text",
+                description = "Translate to Russian",
+                tags = listOf("translate", "russian")
+            )
+        )
     }
 }
 

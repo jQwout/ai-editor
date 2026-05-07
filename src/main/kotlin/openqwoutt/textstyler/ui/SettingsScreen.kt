@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -19,11 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -70,6 +64,10 @@ fun SettingsScreen(
     var providerExpanded by remember { mutableStateOf(false) }
     var modelExpanded by remember { mutableStateOf(false) }
     var isCustomModel by remember { mutableStateOf(settings.aiModel.isNotBlank() && settings.aiModel !in availableModels) }
+    var autoPaste by remember { mutableStateOf(settings.autoPaste) }
+    var autoCopyResult by remember { mutableStateOf(settings.autoCopyResult) }
+    var soundEffects by remember { mutableStateOf(settings.soundEffects) }
+    var hapticFeedback by remember { mutableStateOf(settings.hapticFeedback) }
 
     Surface(
         modifier = Modifier.fillMaxSize().systemBarsPadding(),
@@ -161,6 +159,52 @@ fun SettingsScreen(
                         )
                     }
 
+                        OutlinedTextField(
+                            value = model,
+                            onValueChange = { model = it },
+                            label = { Text("Model ID") },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
+                            singleLine = true
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                color = Panel,
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Preferences",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    SettingsToggleRow(
+                        title = "Auto-paste from clipboard",
+                        checked = autoPaste,
+                        onCheckedChange = { autoPaste = it }
+                    )
+                    SettingsToggleRow(
+                        title = "Auto-copy result",
+                        checked = autoCopyResult,
+                        onCheckedChange = { autoCopyResult = it }
+                    )
+                    SettingsToggleRow(
+                        title = "Sound effects",
+                        checked = soundEffects,
+                        onCheckedChange = { soundEffects = it }
+                    )
+                    SettingsToggleRow(
+                        title = "Haptic feedback",
+                        checked = hapticFeedback,
+                        onCheckedChange = { hapticFeedback = it }
+                    )
                     if (selectedProvider == AiProvider.OPEN_ROUTER || selectedProvider == AiProvider.GROQ) {
                         Text(
                             text = "Model",
@@ -199,11 +243,15 @@ fun SettingsScreen(
             Button(
                 onClick = {
                     onSave(
-                        settings.copy(
+                        AppSettings(
                             backendUrl = backendUrl.trim(),
-                            aiProvider = selectedProvider.name,
-                            aiModel = aiModel.trim(),
-                            apiKey = apiKey.trim()
+                            mode = mode,
+                            apiKey = apiKey.trim(),
+                            model = model.trim(),
+                            autoPaste = autoPaste,
+                            autoCopyResult = autoCopyResult,
+                            soundEffects = soundEffects,
+                            hapticFeedback = hapticFeedback
                         )
                     )
                 },
@@ -219,7 +267,6 @@ fun SettingsScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModelDropdown(
     selectedModel: String,
@@ -230,6 +277,10 @@ private fun ModelDropdown(
     availableModels: List<String>,
     isLoading: Boolean,
     defaultModel: String
+private fun SettingsToggleRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
 ) {
     var customText by remember { mutableStateOf(if (isCustom) selectedModel else "") }
 
@@ -298,5 +349,15 @@ private fun ModelDropdown(
                 singleLine = true
             )
         }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = title, color = TextSecondary)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
     }
 }

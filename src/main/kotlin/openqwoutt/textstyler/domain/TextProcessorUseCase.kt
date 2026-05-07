@@ -1,7 +1,9 @@
 package openqwoutt.miniapp.textstyler.domain
 
+import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textprocessor.app.BuildConfig
 import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AiProvider
@@ -9,6 +11,7 @@ import openqwoutt.textstyler.data.settings.AppSettings
 import openqwoutt.textstyler.network.AiApiClient
 import openqwoutt.textstyler.network.ChatMessage
 
+@Inject
 class TextProcessorUseCase(
     private val maxChars: Int = 3000,
     private val backendUrl: String = BuildConfig.AI_BACKEND_URL,
@@ -60,6 +63,7 @@ class TextProcessorUseCase(
         return cleaned.take(maxChars)
     }
 
+
     private suspend fun sendToBackend(text: String, mode: StyleMode): String = withContext(Dispatchers.IO) {
         val response = apiClient.processText(effectiveBackendUrl, text, mode.id)
         response.result
@@ -69,14 +73,14 @@ class TextProcessorUseCase(
         val provider = settings_?.toAiProvider() ?: AiProvider.POLLINATIONS
         val model = settings_?.effectiveModel() ?: provider.model
         val apiKey = settings_?.apiKey
-        
+
         val response = apiClient.chatCompletion(
             provider = provider,
             model = model,
             messages = listOf(ChatMessage(role = "user", content = buildPrompt(text, mode))),
             apiKey = apiKey
         )
-        
+
         response.firstContent() ?: error("No response from API")
     }
 
@@ -91,7 +95,7 @@ class TextProcessorUseCase(
             else -> "Process this text: $text"
         }
     }
-    
+
     fun close() {
         apiClient.close()
     }

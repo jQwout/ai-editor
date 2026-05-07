@@ -2,7 +2,9 @@ package openqwoutt.textstyler.data.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import dev.zacsweers.metro.Inject
 
+@Inject
 class SettingsRepository(context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(
@@ -52,6 +54,10 @@ class SettingsRepository(context: Context) {
         private const val KEY_AUTO_COPY = "auto_copy"
         private const val KEY_SOUND = "sound_effects"
         private const val KEY_HAPTIC = "haptic_feedback"
+        private const val KEY_SAVE_HISTORY = "save_history"
+        private const val KEY_API_MODE = "api_mode"
+        private const val KEY_API_KEY = "api_key"
+        private const val KEY_MODEL = "model"
         private const val KEY_AI_PROVIDER = "ai_provider"
         private const val KEY_AI_MODEL = "ai_model"
         private const val KEY_API_KEY = "api_key"

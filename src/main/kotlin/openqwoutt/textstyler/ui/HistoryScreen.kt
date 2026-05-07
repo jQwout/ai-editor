@@ -43,10 +43,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import openqwoutt.miniapp.textstyler.domain.model.Interaction
 import openqwoutt.miniapp.textstyler.domain.model.InteractionStatus
 import openqwoutt.miniapp.textstyler.presentation.HistoryViewModel
+import openqwoutt.textprocessor.app.TextProcessorApplication
 
 // Telegram-style dark palette (same as TextStylerScreen)
 private val Bg = Color(0xFF0F0F0F)
@@ -64,7 +66,9 @@ private val SuccessColor = Color(0xFF4CAF50)
 @Composable
 fun HistoryScreen(
     onBack: () -> Unit,
-    viewModel: HistoryViewModel = viewModel()
+    viewModel: HistoryViewModel = viewModel(
+        factory = (LocalContext.current.applicationContext as TextProcessorApplication).appGraph.historyViewModelFactory
+    )
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current

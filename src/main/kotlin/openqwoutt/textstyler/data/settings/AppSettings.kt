@@ -63,7 +63,7 @@ data class AppSettings(
     val apiKey: String = ""
 ) {
     fun toAiProvider(): AiProvider = AiProvider.fromString(aiProvider)
-    
+
     fun effectiveModel(): String {
         return aiModel.takeIf { it.isNotBlank() } ?: toAiProvider().model
     }
