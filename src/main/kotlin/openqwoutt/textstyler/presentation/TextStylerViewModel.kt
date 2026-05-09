@@ -8,9 +8,13 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import openqwoutt.miniapp.textstyler.domain.StreamingResult
+import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.data.prompts.PromptCategory
 import openqwoutt.miniapp.textstyler.data.prompts.PromptRepository
 import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
@@ -43,7 +47,9 @@ data class TextStylerState(
     val showHistory: Boolean = false,
     val showModePicker: Boolean = false,
     val result: String? = null,
+    val resultTokens: List<String> = emptyList(),
     val isLoading: Boolean = false,
+    val isStreaming: Boolean = false,
     val error: String? = null,
     val isTextTruncated: Boolean = false,
     val showSettings: Boolean = false,
@@ -203,77 +209,153 @@ class TextStylerViewModel(
         }
 
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null, result = null) }
+            _state.update { it.copy(isLoading = true, error = null, result = null, resultTokens = emptyList()) }
 
-            when (
-                val result = textProcessorUseCase.processText(
+            val useStreaming = currentState.settings.useStreaming && !currentState.settings.useBackend
+
+            if (useStreaming) {
+                // Streaming mode
+                _state.update { it.copy(isStreaming = true) }
+                
+                val accumulated = StringBuilder()
+                
+                textProcessorUseCase.processTextStreamingComplete(
                     inputText = currentState.inputText,
                     mode = currentState.selectedMode,
                     template = currentState.selectedTemplate
-                )
-            ) {
-                is TextStylerResult.Success -> {
+                ).catch { e ->
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            result = result.result,
+                            isStreaming = false,
+                            error = e.message ?: "Could not process this text. Try again."
+                        )
+                    }
+                }.onCompletion {
+                    // Streaming complete
+                    val finalResult = accumulated.toString()
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            isStreaming = false,
+                            result = finalResult,
                             isTextTruncated = currentState.inputText.length > 3000
                         )
                     }
-                    // Save to history (opt-out)
-                    if (currentState.settings.saveHistory) {
+                    // Save to history
+                    if (currentState.settings.saveHistory && finalResult.isNotBlank()) {
                         interactionRepository.save(
                             inputText = currentState.inputText,
-                            outputText = result.result,
+                            outputText = finalResult,
                             mode = currentState.selectedMode.id,
                             status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.SUCCESS
                         )
                     }
-                    // Emit event for UI to handle callbacks
-                    when (_state.value.closeBehavior) {
-                        CloseBehavior.FinishWithResult -> {
-                            _events.emit(MiniAppEvent.ResultReady(result.result))
-                            _events.emit(MiniAppEvent.NavigateBack)
+                    // Handle close behavior
+                    handleCloseBehavior(finalResult)
+                }.collect { streamingResult ->
+                    when (streamingResult) {
+                        is StreamingResult.Started -> {
+                            // Already set isStreaming above
                         }
-                        CloseBehavior.CopyToClipboard -> {
-                            _events.emit(MiniAppEvent.ResultReady(result.result))
+                        is StreamingResult.Token -> {
+                            accumulated.append(streamingResult.text)
+                            _state.update {
+                                it.copy(resultTokens = accumulated.toString().split("").filter { it.isNotEmpty() })
+                            }
                         }
-                        CloseBehavior.NavigateBack, CloseBehavior.FinishActivity -> {
-                            // Do nothing extra, just show result
+                        is StreamingResult.Done -> {
+                            // Will be handled in onCompletion
+                        }
+                        is StreamingResult.Error -> {
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    isStreaming = false,
+                                    error = streamingResult.message
+                                )
+                            }
                         }
                     }
                 }
-                TextStylerResult.EmptyInput -> {
-                    _state.update {
-                        it.copy(isLoading = false, error = "Add text or paste screenshot OCR first")
-                    }
-                }
-                TextStylerResult.OrchestratorFailed -> {
-                    val errorMsg = "Could not process this text. Try again."
-                    _state.update {
-                        it.copy(isLoading = false, error = errorMsg)
-                    }
-                    // Save error to history
-                    interactionRepository.save(
+            } else {
+                // Non-streaming mode (fallback)
+                when (
+                    val result = textProcessorUseCase.processText(
                         inputText = currentState.inputText,
-                        outputText = null,
-                        mode = currentState.selectedMode.id,
-                        status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.ERROR,
-                        errorMessage = errorMsg
+                        mode = currentState.selectedMode,
+                        template = currentState.selectedTemplate
                     )
-                }
-                is TextStylerResult.Failure -> {
-                    _state.update {
-                        it.copy(isLoading = false, error = result.message)
+                ) {
+                    is TextStylerResult.Success -> {
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                result = result.result,
+                                resultTokens = result.result.split("").filter { it.isNotEmpty() },
+                                isTextTruncated = currentState.inputText.length > 3000
+                            )
+                        }
+                        if (currentState.settings.saveHistory) {
+                            interactionRepository.save(
+                                inputText = currentState.inputText,
+                                outputText = result.result,
+                                mode = currentState.selectedMode.id,
+                                status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.SUCCESS
+                            )
+                        }
+                        handleCloseBehavior(result.result)
                     }
-                    interactionRepository.save(
-                        inputText = currentState.inputText,
-                        outputText = null,
-                        mode = currentState.selectedMode.id,
-                        status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.ERROR,
-                        errorMessage = result.message
-                    )
+                    TextStylerResult.EmptyInput -> {
+                        _state.update {
+                            it.copy(isLoading = false, error = "Add text or paste screenshot OCR first")
+                        }
+                    }
+                    TextStylerResult.OrchestratorFailed -> {
+                        val errorMsg = "Could not process this text. Try again."
+                        _state.update {
+                            it.copy(isLoading = false, error = errorMsg)
+                        }
+                        interactionRepository.save(
+                            inputText = currentState.inputText,
+                            outputText = null,
+                            mode = currentState.selectedMode.id,
+                            status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.ERROR,
+                            errorMessage = errorMsg
+                        )
+                    }
+                    is TextStylerResult.Failure -> {
+                        _state.update {
+                            it.copy(isLoading = false, error = result.message)
+                        }
+                        interactionRepository.save(
+                            inputText = currentState.inputText,
+                            outputText = null,
+                            mode = currentState.selectedMode.id,
+                            status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.ERROR,
+                            errorMessage = result.message
+                        )
+                    }
                 }
+            }
+        }
+    }
+
+    private fun handleCloseBehavior(result: String) {
+        when (_state.value.closeBehavior) {
+            CloseBehavior.FinishWithResult -> {
+                viewModelScope.launch {
+                    _events.emit(MiniAppEvent.ResultReady(result))
+                    _events.emit(MiniAppEvent.NavigateBack)
+                }
+            }
+            CloseBehavior.CopyToClipboard -> {
+                viewModelScope.launch {
+                    _events.emit(MiniAppEvent.ResultReady(result))
+                }
+            }
+            CloseBehavior.NavigateBack, CloseBehavior.FinishActivity -> {
+                // Do nothing extra, just show result
             }
         }
     }

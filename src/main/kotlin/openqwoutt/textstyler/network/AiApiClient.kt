@@ -19,6 +19,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.headers
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -58,6 +61,73 @@ class AiApiClient {
                 connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
                 readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
             }
+        }
+    }
+
+    /**
+     * Stream chat completion as a Flow of token strings.
+     * Returns tokens as they arrive from the SSE stream.
+     */
+    fun streamChatCompletion(
+        provider: AiProvider,
+        model: String,
+        messages: List<ChatMessage>,
+        apiKey: String? = null,
+        temperature: Double = 0.7,
+        topP: Double = 0.8,
+        maxTokens: Int = 1000
+    ): Flow<String> = flow {
+        require(!provider.requiresApiKey || !apiKey.isNullOrBlank()) {
+            "API key is required for ${provider.displayName}"
+        }
+
+        val request = ChatCompletionRequest(
+            model = model,
+            messages = messages,
+            maxTokens = maxTokens,
+            temperature = temperature,
+            topP = topP,
+            stream = true
+        )
+
+        val response = client.post("${provider.baseUrl}/chat/completions") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Text.EventStream)
+            if (!apiKey.isNullOrBlank() && provider.requiresApiKey) {
+                header("Authorization", "Bearer $apiKey")
+            }
+            setBody(request)
+        }
+
+        val channel = response.bodyAsChannel()
+        val buffer = ByteArray(8192)
+        var partialLine = ""
+
+        while (!channel.isClosedForRead) {
+            val bytesRead = channel.readAvailable(buffer)
+            if (bytesRead > 0) {
+                val chunk = String(buffer, 0, bytesRead, Charsets.UTF_8)
+                val lines = (partialLine + chunk).split("\n")
+                partialLine = lines.last()
+
+                for (i in 0 until lines.size - 1) {
+                    val line = lines[i]
+                    if (line.startsWith("data: ")) {
+                        val data = line.substring(6)
+                        if (data == "[DONE]") return@flow
+                        parseSseData(data)?.let { token -> emit(token) }
+                    }
+                }
+            }
+        }
+    }.flowOn(Dispatchers.IO)
+
+    private fun parseSseData(data: String): String? {
+        return try {
+            val chunk = json.decodeFromString<StreamingChoice>(data)
+            chunk.delta?.content
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -147,7 +217,18 @@ data class ChatCompletionRequest(
     val maxTokens: Int = 1000,
     val temperature: Double = 0.7,
     @SerialName("top_p")
-    val topP: Double = 0.8
+    val topP: Double = 0.8,
+    val stream: Boolean = false
+)
+
+@Serializable
+data class StreamingChoice(
+    val delta: StreamingDelta? = null
+)
+
+@Serializable
+data class StreamingDelta(
+    val content: String? = null
 )
 
 @Serializable
