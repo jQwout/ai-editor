@@ -13,8 +13,9 @@ class AiApiClientTest {
     fun nvidiaChatCompletion_withSimplePrompt_returnsNonEmptyContent() = runBlocking {
         val apiKey = System.getenv("NVIDIA_API_KEY")
         assumeTrue("NVIDIA_API_KEY not set", !apiKey.isNullOrBlank())
+        val client = AiApiClient()
 
-        val response = AiApiClient.chatCompletion(
+        val response = client.chatCompletion(
             provider = AiProvider.NVIDIA,
             model = "meta/llama-3.1-70b-instruct",
             messages = listOf(ChatMessage(role = "user", content = "Say hello in one word.")),
@@ -31,8 +32,9 @@ class AiApiClientTest {
     fun nvidiaChatCompletion_withTemperature_returnsNonEmptyContent() = runBlocking {
         val apiKey = System.getenv("NVIDIA_API_KEY")
         assumeTrue("NVIDIA_API_KEY not set", !apiKey.isNullOrBlank())
+        val client = AiApiClient()
 
-        val response = AiApiClient.chatCompletion(
+        val response = client.chatCompletion(
             provider = AiProvider.NVIDIA,
             model = "meta/llama-3.1-70b-instruct",
             messages = listOf(
@@ -55,8 +57,9 @@ class AiApiClientTest {
     fun nvidiaChatCompletion_qwenCoder_returnsNonEmptyContent() = runBlocking {
         val apiKey = System.getenv("NVIDIA_API_KEY")
         assumeTrue("NVIDIA_API_KEY not set", !apiKey.isNullOrBlank())
+        val client = AiApiClient()
 
-        val response = AiApiClient.chatCompletion(
+        val response = client.chatCompletion(
             provider = AiProvider.NVIDIA,
             model = "qwen/qwen3-coder-480b-a35b-instruct",
             messages = listOf(

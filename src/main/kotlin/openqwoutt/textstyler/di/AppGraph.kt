@@ -15,10 +15,10 @@ import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.presentation.HistoryViewModel
 import openqwoutt.miniapp.textstyler.presentation.TextStylerViewModel
 import openqwoutt.textprocessor.app.BuildConfig
-import openqwoutt.textstyler.data.settings.AppSettings
 import openqwoutt.textstyler.data.settings.OpenRouterModelsRepository
 import openqwoutt.textstyler.data.settings.SecureStorage
 import openqwoutt.textstyler.data.settings.SettingsRepository
+import openqwoutt.textstyler.network.AiApiClient
 
 /**
  * Application-scoped Metro dependency graph.
@@ -39,6 +39,7 @@ interface AppGraph {
     val interactionRepository: InteractionRepository
     val secureStorage: SecureStorage
     val openRouterModelsRepository: OpenRouterModelsRepository
+    val aiApiClient: AiApiClient
 
     /** Use case */
     val textProcessorUseCase: TextProcessorUseCase
@@ -67,15 +68,30 @@ interface AppGraph {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideAppSettings(settingsRepository: SettingsRepository): AppSettings = settingsRepository.load()
+    fun provideSecureStorage(context: Context): SecureStorage = SecureStorage(context)
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideTextProcessorUseCase(settings: AppSettings): TextProcessorUseCase =
+    fun provideSettingsRepository(
+        context: Context,
+        secureStorage: SecureStorage
+    ): SettingsRepository = SettingsRepository(context, secureStorage)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideAiApiClient(): AiApiClient = AiApiClient()
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideTextProcessorUseCase(
+        settingsRepository: SettingsRepository,
+        aiApiClient: AiApiClient
+    ): TextProcessorUseCase =
         TextProcessorUseCase(
+            settingsRepository = settingsRepository,
+            apiClient = aiApiClient,
             maxChars = 3000,
-            backendUrl = BuildConfig.AI_BACKEND_URL,
-            settings = settings
+            backendUrl = BuildConfig.AI_BACKEND_URL
         )
 
     @Provides

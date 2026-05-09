@@ -32,7 +32,8 @@ fun TextStylerMiniApp(
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val appGraph = (context.applicationContext as TextProcessorApplication).appGraph
+    val appGraph = (context.applicationContext as? TextProcessorApplication)?.appGraph
+        ?: error("TextProcessorApplication is required. Got: ${context.applicationContext::class.java.name}")
     val viewModel: TextStylerViewModel = viewModel(
         factory = appGraph.textStylerViewModelFactory
     )

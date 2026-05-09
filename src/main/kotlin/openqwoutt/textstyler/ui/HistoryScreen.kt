@@ -67,7 +67,8 @@ private val SuccessColor = Color(0xFF4CAF50)
 fun HistoryScreen(
     onBack: () -> Unit,
     viewModel: HistoryViewModel = viewModel(
-        factory = (LocalContext.current.applicationContext as TextProcessorApplication).appGraph.historyViewModelFactory
+        factory = ((LocalContext.current.applicationContext as? TextProcessorApplication)?.appGraph
+            ?: error("TextProcessorApplication is required for HistoryScreen")).historyViewModelFactory
     )
 ) {
     val state by viewModel.state.collectAsState()

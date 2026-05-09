@@ -18,7 +18,10 @@ class TextProcessorApplication : Application() {
         appGraph = createGraphFactory<AppGraph.Factory>().create(this)
 
         GlobalScope.launch(Dispatchers.IO) {
-            OpenRouterModelsCache.initialize(this@TextProcessorApplication)
+            OpenRouterModelsCache.initialize(
+                repository = appGraph.openRouterModelsRepository,
+                settingsRepository = appGraph.settingsRepository
+            )
         }
     }
 }

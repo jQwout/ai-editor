@@ -2,12 +2,14 @@ package openqwoutt.textstyler.data.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import dev.zacsweers.metro.Inject
 
-@Inject
-class SettingsRepository(context: Context) {
+class SettingsRepository(
+    context: Context,
+    private val secureStorage: SecureStorage
+) {
 
     private val prefs: SharedPreferences = try {
         val masterKey = MasterKey.Builder(context)
@@ -20,13 +22,18 @@ class SettingsRepository(context: Context) {
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
+        ).also {
+            Log.i(TAG, "EncryptedSharedPreferences initialized for settings")
+        }
     } catch (e: Exception) {
-        // Fallback to regular SharedPreferences if encryption fails
+        Log.e(TAG, "EncryptedSharedPreferences failed for settings; using private SharedPreferences", e)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     fun load(): AppSettings {
+        val secureApiKey = secureStorage.getApiKey()
+        val legacyApiKey = prefs.getString(KEY_API_KEY, AppSettings().apiKey) ?: AppSettings().apiKey
+
         return AppSettings(
             backendUrl = prefs.getString(KEY_BACKEND_URL, AppSettings().backendUrl)
                 ?: AppSettings().backendUrl,
@@ -42,12 +49,17 @@ class SettingsRepository(context: Context) {
                 ?: AppSettings().aiProvider,
             aiModel = prefs.getString(KEY_AI_MODEL, AppSettings().aiModel)
                 ?: AppSettings().aiModel,
-            apiKey = prefs.getString(KEY_API_KEY, AppSettings().apiKey)
-                ?: AppSettings().apiKey
+            apiKey = secureApiKey.ifBlank { legacyApiKey }
         )
     }
 
     fun save(settings: AppSettings) {
+        if (settings.apiKey.isBlank()) {
+            secureStorage.clearApiKey()
+        } else {
+            secureStorage.setApiKey(settings.apiKey)
+        }
+
         prefs.edit().apply {
             putString(KEY_BACKEND_URL, settings.backendUrl)
             putString(KEY_DEFAULT_MODE, settings.defaultMode)
@@ -59,12 +71,13 @@ class SettingsRepository(context: Context) {
             putBoolean(KEY_USE_BACKEND, settings.useBackend)
             putString(KEY_AI_PROVIDER, settings.aiProvider)
             putString(KEY_AI_MODEL, settings.aiModel)
-            putString(KEY_API_KEY, settings.apiKey)
+            remove(KEY_API_KEY)
             apply()
         }
     }
 
     companion object {
+        private const val TAG = "SettingsRepository"
         private const val PREFS_NAME = "textstyler_settings"
         private const val KEY_BACKEND_URL = "backend_url"
         private const val KEY_DEFAULT_MODE = "default_mode"
@@ -74,9 +87,7 @@ class SettingsRepository(context: Context) {
         private const val KEY_HAPTIC = "haptic_feedback"
         private const val KEY_SAVE_HISTORY = "save_history"
         private const val KEY_USE_BACKEND = "use_backend"
-        private const val KEY_API_MODE = "api_mode"
         private const val KEY_API_KEY = "api_key"
-        private const val KEY_MODEL = "model"
         private const val KEY_AI_PROVIDER = "ai_provider"
         private const val KEY_AI_MODEL = "ai_model"
     }

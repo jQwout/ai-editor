@@ -125,6 +125,7 @@ enum class StyleMode(
 
 sealed class TextStylerResult {
     data class Success(val result: String) : TextStylerResult()
+    data class Failure(val message: String) : TextStylerResult()
     data object EmptyInput : TextStylerResult()
     data object OrchestratorFailed : TextStylerResult()
 }

@@ -1,25 +1,20 @@
 package openqwoutt.miniapp.textstyler.domain
 
-import dev.zacsweers.metro.Inject
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textprocessor.app.BuildConfig
-import openqwoutt.textstyler.data.settings.AiProvider
-import openqwoutt.textstyler.data.settings.AppSettings
+import openqwoutt.textstyler.data.settings.SettingsRepository
 import openqwoutt.textstyler.network.AiApiClient
 import openqwoutt.textstyler.network.ChatMessage
 
-@Inject
 class TextProcessorUseCase(
+    private val settingsRepository: SettingsRepository,
+    private val apiClient: AiApiClient,
     private val maxChars: Int = 3000,
-    private val backendUrl: String = BuildConfig.AI_BACKEND_URL,
-    settings: AppSettings? = null
+    private val backendUrl: String = BuildConfig.AI_BACKEND_URL
 ) {
-    private val effectiveBackendUrl = settings?.backendUrl?.takeIf { it.isNotBlank() } ?: backendUrl
-    private val settings_ = settings
-    // Use singleton to avoid HttpClient leaks
-    private val apiClient get() = AiApiClient
 
     suspend fun processText(
         inputText: String,
@@ -32,16 +27,20 @@ class TextProcessorUseCase(
 
         val cleanedText = cleanText(inputText)
         val textWithTemplate = applyTemplate(cleanedText, template)
-        
+        val settings = settingsRepository.load()
+
         return runCatching {
-            val result = if (settings_?.useBackend == true) {
-                sendToBackend(textWithTemplate, mode)
+            val result = if (settings.useBackend) {
+                sendToBackend(textWithTemplate, mode, settings.backendUrl)
             } else {
                 sendToOpenAiCompatibleApi(textWithTemplate, mode)
             }
             TextStylerResult.Success(result)
-        }.getOrElse {
-            TextStylerResult.OrchestratorFailed
+        }.getOrElse { throwable ->
+            Log.e(TAG, "Text processing failed", throwable)
+            TextStylerResult.Failure(
+                throwable.message ?: "Could not process this text. Try again."
+            )
         }
     }
 
@@ -63,15 +62,21 @@ class TextProcessorUseCase(
     }
 
 
-    private suspend fun sendToBackend(text: String, mode: StyleMode): String = withContext(Dispatchers.IO) {
+    private suspend fun sendToBackend(text: String, mode: StyleMode, configuredBackendUrl: String): String = withContext(Dispatchers.IO) {
+        val effectiveBackendUrl = configuredBackendUrl.takeIf { it.isNotBlank() } ?: backendUrl
         val response = apiClient.processText(effectiveBackendUrl, text, mode.id)
         response.result
     }
 
     private suspend fun sendToOpenAiCompatibleApi(text: String, mode: StyleMode): String = withContext(Dispatchers.IO) {
-        val provider = settings_?.toAiProvider() ?: AiProvider.NVIDIA
-        val model = settings_?.effectiveModel() ?: provider.model
-        val apiKey = settings_?.apiKey
+        val settings = settingsRepository.load()
+        val provider = settings.toAiProvider()
+        val model = settings.effectiveModel()
+        val apiKey = settings.apiKey
+
+        if (provider.requiresApiKey && apiKey.isBlank()) {
+            error("Add ${provider.displayName} API key in Settings.")
+        }
 
         val response = apiClient.chatCompletion(
             provider = provider,
@@ -87,7 +92,7 @@ class TextProcessorUseCase(
         response.firstContent() ?: error("No response from API")
     }
 
-    fun close() {
-        apiClient.close()
+    companion object {
+        private const val TAG = "TextProcessorUseCase"
     }
 }

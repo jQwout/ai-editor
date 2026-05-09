@@ -33,8 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,19 +64,19 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val currentProvider = settings.toAiProvider()
-    var selectedProvider by remember { mutableStateOf(currentProvider) }
-    var apiKey by remember { mutableStateOf(settings.apiKey) }
-    var aiModel by remember { mutableStateOf(settings.aiModel) }
-    var backendUrl by remember { mutableStateOf(settings.backendUrl) }
+    var selectedProvider by remember(settings.aiProvider) { mutableStateOf(currentProvider) }
+    var apiKey by remember(settings.apiKey) { mutableStateOf(settings.apiKey) }
+    var aiModel by remember(settings.aiModel) { mutableStateOf(settings.aiModel) }
+    var backendUrl by remember(settings.backendUrl) { mutableStateOf(settings.backendUrl) }
     var providerExpanded by remember { mutableStateOf(false) }
     var modelExpanded by remember { mutableStateOf(false) }
-    var isCustomModel by remember { mutableStateOf(false) }
-    var autoPaste by remember { mutableStateOf(settings.autoPaste) }
-    var autoCopyResult by remember { mutableStateOf(settings.autoCopyResult) }
-    var soundEffects by remember { mutableStateOf(settings.soundEffects) }
-    var hapticFeedback by remember { mutableStateOf(settings.hapticFeedback) }
-    var saveHistory by remember { mutableStateOf(settings.saveHistory) }
-    var useBackend by remember { mutableStateOf(settings.useBackend) }
+    var customModelSelected by remember(settings.aiModel) { mutableStateOf(false) }
+    var autoPaste by remember(settings.autoPaste) { mutableStateOf(settings.autoPaste) }
+    var autoCopyResult by remember(settings.autoCopyResult) { mutableStateOf(settings.autoCopyResult) }
+    var soundEffects by remember(settings.soundEffects) { mutableStateOf(settings.soundEffects) }
+    var hapticFeedback by remember(settings.hapticFeedback) { mutableStateOf(settings.hapticFeedback) }
+    var saveHistory by remember(settings.saveHistory) { mutableStateOf(settings.saveHistory) }
+    var useBackend by remember(settings.useBackend) { mutableStateOf(settings.useBackend) }
 
     Surface(
         modifier = Modifier.fillMaxSize().systemBarsPadding().imePadding(),
@@ -184,8 +183,10 @@ fun SettingsScreen(
                             else -> availableModels
                         }
 
-                        SideEffect {
-                            isCustomModel = aiModel.isNotBlank() && aiModel !in providerModels
+                        val isCustomModel by remember(aiModel, providerModels, customModelSelected) {
+                            derivedStateOf {
+                                customModelSelected || (aiModel.isNotBlank() && aiModel !in providerModels)
+                            }
                         }
 
                         ModelDropdown(
@@ -193,7 +194,7 @@ fun SettingsScreen(
                             isCustom = isCustomModel,
                             onModelSelected = { selected, custom ->
                                 aiModel = selected
-                                isCustomModel = custom
+                                customModelSelected = custom
                             },
                             expanded = modelExpanded,
                             onExpandedChange = { modelExpanded = it },
@@ -306,7 +307,9 @@ private fun ModelDropdown(
     isLoading: Boolean,
     defaultModel: String
 ) {
-    var customText by remember { mutableStateOf(if (isCustom) selectedModel else "") }
+    var customText by remember(selectedModel, isCustom) {
+        mutableStateOf(if (isCustom) selectedModel else "")
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (isLoading) {

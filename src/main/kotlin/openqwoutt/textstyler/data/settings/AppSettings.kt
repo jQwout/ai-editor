@@ -1,6 +1,7 @@
 package openqwoutt.textstyler.data.settings
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * Supported AI providers for text processing.
@@ -42,6 +43,7 @@ data class AppSettings(
     val hapticFeedback: Boolean = true,
     val aiProvider: String = AiProvider.OPEN_ROUTER.name,
     val aiModel: String = "",
+    @Transient
     val apiKey: String = "",
     val saveHistory: Boolean = true,
     val useBackend: Boolean = false

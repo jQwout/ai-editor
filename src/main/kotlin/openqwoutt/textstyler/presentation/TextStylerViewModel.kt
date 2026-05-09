@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import openqwoutt.miniapp.textstyler.data.prompts.PromptCategory
@@ -83,7 +84,7 @@ sealed class TextStylerAction {
 }
 
 class TextStylerViewModel(
-    private var textProcessorUseCase: TextProcessorUseCase,
+    private val textProcessorUseCase: TextProcessorUseCase,
     private val settingsRepository: SettingsRepository,
     private val promptRepository: PromptRepository,
     private val interactionRepository: InteractionRepository
@@ -102,8 +103,13 @@ class TextStylerViewModel(
         val categories = promptRepository.getCategories()
         _state.update { it.copy(settings = saved, availableTemplates = templates, availableCategories = categories) }
 
-        // Sync available models from OpenRouterModelsCache
-        _state.update { it.copy(availableModels = OpenRouterModelsCache.models.value, isLoadingModels = OpenRouterModelsCache.isLoading.value) }
+        viewModelScope.launch {
+            combine(OpenRouterModelsCache.models, OpenRouterModelsCache.isLoading) { models, isLoading ->
+                models to isLoading
+            }.collect { (models, isLoading) ->
+                _state.update { it.copy(availableModels = models, isLoadingModels = isLoading) }
+            }
+        }
 
         // Apply initial input text if provided
         _state.value.initialInputText?.let { initialText ->
@@ -138,11 +144,10 @@ class TextStylerViewModel(
                 _state.update {
                     it.copy(settings = action.settings, showSettings = false, error = null)
                 }
-                // Reload the use case with new settings
-                textProcessorUseCase = TextProcessorUseCase(settings = action.settings)
             }
             is TextStylerAction.ReloadUseCaseWithSettings -> {
-                textProcessorUseCase = TextProcessorUseCase(settings = action.settings)
+                settingsRepository.save(action.settings)
+                _state.update { it.copy(settings = action.settings, error = null) }
             }
             is TextStylerAction.SelectTemplate -> {
                 _state.update { it.copy(selectedTemplate = action.template) }
@@ -255,6 +260,18 @@ class TextStylerViewModel(
                         mode = currentState.selectedMode.id,
                         status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.ERROR,
                         errorMessage = errorMsg
+                    )
+                }
+                is TextStylerResult.Failure -> {
+                    _state.update {
+                        it.copy(isLoading = false, error = result.message)
+                    }
+                    interactionRepository.save(
+                        inputText = currentState.inputText,
+                        outputText = null,
+                        mode = currentState.selectedMode.id,
+                        status = openqwoutt.miniapp.textstyler.domain.model.InteractionStatus.ERROR,
+                        errorMessage = result.message
                     )
                 }
             }
