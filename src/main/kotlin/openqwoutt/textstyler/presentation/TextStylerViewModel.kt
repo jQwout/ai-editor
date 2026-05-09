@@ -218,7 +218,8 @@ class TextStylerViewModel(
                 _state.update { it.copy(isStreaming = true) }
                 
                 val accumulated = StringBuilder()
-                
+                val accumulatedChars = mutableListOf<String>()
+
                 textProcessorUseCase.processTextStreamingComplete(
                     inputText = currentState.inputText,
                     mode = currentState.selectedMode,
@@ -260,8 +261,10 @@ class TextStylerViewModel(
                         }
                         is StreamingResult.Token -> {
                             accumulated.append(streamingResult.text)
+                            val newChars = streamingResult.text.split("").filter { it.isNotEmpty() }
+                            accumulatedChars.addAll(newChars)
                             _state.update {
-                                it.copy(resultTokens = accumulated.toString().split("").filter { it.isNotEmpty() })
+                                it.copy(resultTokens = accumulatedChars.toList())
                             }
                         }
                         is StreamingResult.Done -> {
