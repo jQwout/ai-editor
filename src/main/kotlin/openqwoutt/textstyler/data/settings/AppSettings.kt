@@ -15,33 +15,35 @@ enum class AiProvider(
     OPEN_ROUTER(
         displayName = "OpenRouter",
         baseUrl = "https://openrouter.ai/api/v1",
-        model = "google/gemma-2-2b-it",
+        model = "openai/gpt-4o-mini",
         requiresApiKey = true
     ),
-    POLLINATIONS(
-        displayName = "Pollinations AI",
-        baseUrl = "https://gen.pollinations.ai/v1",
-        model = "openai/gpt-4o-mini",
-        requiresApiKey = false
-    ),
-    UNCLOSE_AI(
-        displayName = "UncloseAI",
-        baseUrl = "https://uncloseai.com/v1",
-        model = "Qwen/Qwen2.5-7B-Instruct",
-        requiresApiKey = false
-    ),
-    G4F(
-        displayName = "G4F (Chatbot)",
-        baseUrl = "https://g4f.quantumblack.io/v1",
-        model = "gpt-3.5-turbo",
-        requiresApiKey = false
-    ),
-    GROQ(
-        displayName = "Groq",
-        baseUrl = "https://api.groq.com/openai/v1",
-        model = "llama-3.1-70b-versatile",
+    NVIDIA(
+        displayName = "NVIDIA NIM",
+        baseUrl = "https://integrate.api.nvidia.com/v1",
+        model = "meta/llama-3.1-70b-instruct",
         requiresApiKey = true
     );
+
+    /**
+     * Heuristic: does this model id look like it belongs to this provider?
+     * Used as a sanity check before sending a request, to avoid e.g. shipping
+     * an OpenRouter model id to NVIDIA (which returns 401/403, not 404).
+     */
+    fun looksLikeOwnModel(modelId: String): Boolean {
+        if (modelId.isBlank()) return false
+        return when (this) {
+            NVIDIA -> modelId.startsWith("meta/") ||
+                modelId.startsWith("nvidia/") ||
+                modelId.startsWith("qwen/") ||
+                modelId.startsWith("mistralai/") ||
+                modelId.startsWith("google/") ||
+                modelId.startsWith("microsoft/") ||
+                modelId.startsWith("deepseek-ai/")
+            // OpenRouter is permissive: any non-empty id is acceptable.
+            OPEN_ROUTER -> true
+        }
+    }
 
     companion object {
         fun fromString(value: String): AiProvider {
@@ -59,7 +61,14 @@ data class AppSettings(
     val soundEffects: Boolean = false,
     val hapticFeedback: Boolean = true,
     val aiProvider: String = AiProvider.OPEN_ROUTER.name,
-    val apiKey: String = ""
+    val aiModel: String = "",
+    val apiKey: String = "",
+    val saveHistory: Boolean = true,
+    val useBackend: Boolean = false
 ) {
     fun toAiProvider(): AiProvider = AiProvider.fromString(aiProvider)
+
+    fun effectiveModel(): String {
+        return aiModel.takeIf { it.isNotBlank() } ?: toAiProvider().model
+    }
 }
