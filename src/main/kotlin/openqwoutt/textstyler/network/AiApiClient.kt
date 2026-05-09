@@ -5,11 +5,15 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.request.accept
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-import io.ktor.http.headers
+import io.ktor.client.request.header
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -29,6 +33,14 @@ object AiApiClient {
                 isLenient = true
             })
         }
+        install(Logging) {
+            logger = object : Logger {
+                override fun log(message: String) {
+                    println(message)
+                }
+            }
+            level = LogLevel.ALL
+        }
         engine {
             config {
                 connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
@@ -44,20 +56,24 @@ object AiApiClient {
         provider: AiProvider,
         model: String,
         messages: List<ChatMessage>,
-        apiKey: String? = null
+        apiKey: String? = null,
+        temperature: Double = 0.7,
+        topP: Double = 0.8,
+        maxTokens: Int = 1000
     ): ChatCompletionResponse {
         val request = ChatCompletionRequest(
             model = model,
             messages = messages,
-            maxTokens = 1000
+            maxTokens = maxTokens,
+            temperature = temperature,
+            topP = topP
         )
 
         val response = client.post("${provider.baseUrl}/chat/completions") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             if (!apiKey.isNullOrBlank() && provider.requiresApiKey) {
-                headers {
-                    append("Authorization", "Bearer $apiKey")
-                }
+                header("Authorization", "Bearer $apiKey")
             }
             setBody(request)
         }
@@ -93,7 +109,10 @@ data class ChatCompletionRequest(
     val model: String,
     val messages: List<ChatMessage>,
     @SerialName("max_tokens")
-    val maxTokens: Int = 1000
+    val maxTokens: Int = 1000,
+    val temperature: Double = 0.7,
+    @SerialName("top_p")
+    val topP: Double = 0.8
 )
 
 @Serializable

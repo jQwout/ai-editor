@@ -5,7 +5,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textprocessor.app.BuildConfig
-import openqwoutt.textstyler.data.prompts.PromptTemplate
 import openqwoutt.textstyler.data.settings.AiProvider
 import openqwoutt.textstyler.data.settings.AppSettings
 import openqwoutt.textstyler.network.AiApiClient
@@ -35,10 +34,10 @@ class TextProcessorUseCase(
         val textWithTemplate = applyTemplate(cleanedText, template)
         
         return runCatching {
-            val result = if (settings_?.aiProvider != null && settings_?.aiProvider != AiProvider.OPEN_ROUTER.name) {
-                sendToOpenAiCompatibleApi(textWithTemplate, mode)
-            } else {
+            val result = if (settings_?.useBackend == true) {
                 sendToBackend(textWithTemplate, mode)
+            } else {
+                sendToOpenAiCompatibleApi(textWithTemplate, mode)
             }
             TextStylerResult.Success(result)
         }.getOrElse {
@@ -70,30 +69,22 @@ class TextProcessorUseCase(
     }
 
     private suspend fun sendToOpenAiCompatibleApi(text: String, mode: StyleMode): String = withContext(Dispatchers.IO) {
-        val provider = settings_?.toAiProvider() ?: AiProvider.POLLINATIONS
+        val provider = settings_?.toAiProvider() ?: AiProvider.NVIDIA
         val model = settings_?.effectiveModel() ?: provider.model
         val apiKey = settings_?.apiKey
 
         val response = apiClient.chatCompletion(
             provider = provider,
             model = model,
-            messages = listOf(ChatMessage(role = "user", content = buildPrompt(text, mode))),
-            apiKey = apiKey
+            messages = listOf(
+                ChatMessage(role = "system", content = mode.prompt),
+                ChatMessage(role = "user", content = text)
+            ),
+            apiKey = apiKey,
+            temperature = mode.temperature
         )
 
         response.firstContent() ?: error("No response from API")
-    }
-
-    private fun buildPrompt(text: String, mode: StyleMode): String {
-        return when (mode.id) {
-            "style" -> "Improve this text with better style, clarity and grammar: $text"
-            "shorten" -> "Summarize this text concisely: $text"
-            "expand" -> "Expand this text with more detail: $text"
-            "translate" -> "Translate this text to the target language: $text"
-            "analyze" -> "Analyze this text: $text"
-            "screenshot" -> "Describe what's in this screenshot: $text"
-            else -> "Process this text: $text"
-        }
     }
 
     fun close() {

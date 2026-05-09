@@ -2,15 +2,29 @@ package openqwoutt.textstyler.data.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import dev.zacsweers.metro.Inject
 
 @Inject
 class SettingsRepository(context: Context) {
 
-    private val prefs: SharedPreferences = context.getSharedPreferences(
-        PREFS_NAME,
-        Context.MODE_PRIVATE
-    )
+    private val prefs: SharedPreferences = try {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+
+        EncryptedSharedPreferences.create(
+            context,
+            PREFS_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        // Fallback to regular SharedPreferences if encryption fails
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
 
     fun load(): AppSettings {
         return AppSettings(
@@ -22,6 +36,8 @@ class SettingsRepository(context: Context) {
             autoCopyResult = prefs.getBoolean(KEY_AUTO_COPY, AppSettings().autoCopyResult),
             soundEffects = prefs.getBoolean(KEY_SOUND, AppSettings().soundEffects),
             hapticFeedback = prefs.getBoolean(KEY_HAPTIC, AppSettings().hapticFeedback),
+            saveHistory = prefs.getBoolean(KEY_SAVE_HISTORY, AppSettings().saveHistory),
+            useBackend = prefs.getBoolean(KEY_USE_BACKEND, AppSettings().useBackend),
             aiProvider = prefs.getString(KEY_AI_PROVIDER, AppSettings().aiProvider)
                 ?: AppSettings().aiProvider,
             aiModel = prefs.getString(KEY_AI_MODEL, AppSettings().aiModel)
@@ -39,6 +55,8 @@ class SettingsRepository(context: Context) {
             putBoolean(KEY_AUTO_COPY, settings.autoCopyResult)
             putBoolean(KEY_SOUND, settings.soundEffects)
             putBoolean(KEY_HAPTIC, settings.hapticFeedback)
+            putBoolean(KEY_SAVE_HISTORY, settings.saveHistory)
+            putBoolean(KEY_USE_BACKEND, settings.useBackend)
             putString(KEY_AI_PROVIDER, settings.aiProvider)
             putString(KEY_AI_MODEL, settings.aiModel)
             putString(KEY_API_KEY, settings.apiKey)
@@ -55,11 +73,11 @@ class SettingsRepository(context: Context) {
         private const val KEY_SOUND = "sound_effects"
         private const val KEY_HAPTIC = "haptic_feedback"
         private const val KEY_SAVE_HISTORY = "save_history"
+        private const val KEY_USE_BACKEND = "use_backend"
         private const val KEY_API_MODE = "api_mode"
         private const val KEY_API_KEY = "api_key"
         private const val KEY_MODEL = "model"
         private const val KEY_AI_PROVIDER = "ai_provider"
         private const val KEY_AI_MODEL = "ai_model"
-        private const val KEY_API_KEY = "api_key"
     }
 }

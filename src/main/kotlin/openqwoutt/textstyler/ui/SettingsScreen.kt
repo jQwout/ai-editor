@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -18,13 +20,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,8 +55,6 @@ private val Accent = Color(0xFF8D78F0)
 private val TextPrimary = Color(0xFFF4F1F8)
 private val TextSecondary = Color(0xFFB9B5C3)
 
-private val AiProvider.displayName_: String
-    get() = displayName
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -63,14 +71,16 @@ fun SettingsScreen(
     var backendUrl by remember { mutableStateOf(settings.backendUrl) }
     var providerExpanded by remember { mutableStateOf(false) }
     var modelExpanded by remember { mutableStateOf(false) }
-    var isCustomModel by remember { mutableStateOf(settings.aiModel.isNotBlank() && settings.aiModel !in availableModels) }
+    var isCustomModel by remember { mutableStateOf(false) }
     var autoPaste by remember { mutableStateOf(settings.autoPaste) }
     var autoCopyResult by remember { mutableStateOf(settings.autoCopyResult) }
     var soundEffects by remember { mutableStateOf(settings.soundEffects) }
     var hapticFeedback by remember { mutableStateOf(settings.hapticFeedback) }
+    var saveHistory by remember { mutableStateOf(settings.saveHistory) }
+    var useBackend by remember { mutableStateOf(settings.useBackend) }
 
     Surface(
-        modifier = Modifier.fillMaxSize().systemBarsPadding(),
+        modifier = Modifier.fillMaxSize().systemBarsPadding().imePadding(),
         color = AppBg
     ) {
         Column(
@@ -120,7 +130,7 @@ fun SettingsScreen(
                         onExpandedChange = { providerExpanded = it }
                     ) {
                         OutlinedTextField(
-                            value = selectedProvider.displayName_,
+                            value = selectedProvider.displayName,
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Select provider") },
@@ -137,7 +147,7 @@ fun SettingsScreen(
                         ) {
                             AiProvider.entries.forEach { provider ->
                                 DropdownMenuItem(
-                                    text = { Text(provider.displayName_, color = TextPrimary) },
+                                    text = { Text(provider.displayName, color = TextPrimary) },
                                     onClick = {
                                         selectedProvider = provider
                                         providerExpanded = false
@@ -151,7 +161,7 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = apiKey,
                             onValueChange = { apiKey = it },
-                            label = { Text("${selectedProvider.displayName_} API Key") },
+                            label = { Text("${selectedProvider.displayName} API Key") },
                             modifier = Modifier.fillMaxWidth(),
                             textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
                             singleLine = true,
@@ -159,10 +169,51 @@ fun SettingsScreen(
                         )
                     }
 
+                    if (selectedProvider == AiProvider.OPEN_ROUTER || selectedProvider == AiProvider.NVIDIA) {
+                        Text(
+                            text = "Model",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        val providerModels = when (selectedProvider) {
+                            AiProvider.NVIDIA -> listOf(
+                                "qwen/qwen3-coder-480b-a35b-instruct",
+                                "meta/llama-3.1-70b-instruct"
+                            )
+                            else -> availableModels
+                        }
+
+                        SideEffect {
+                            isCustomModel = aiModel.isNotBlank() && aiModel !in providerModels
+                        }
+
+                        ModelDropdown(
+                            selectedModel = aiModel,
+                            isCustom = isCustomModel,
+                            onModelSelected = { selected, custom ->
+                                aiModel = selected
+                                isCustomModel = custom
+                            },
+                            expanded = modelExpanded,
+                            onExpandedChange = { modelExpanded = it },
+                            availableModels = providerModels,
+                            isLoading = isLoadingModels,
+                            defaultModel = selectedProvider.model
+                        )
+                    }
+
+                    SettingsToggleRow(
+                        title = "Use local backend",
+                        checked = useBackend,
+                        onCheckedChange = { useBackend = it }
+                    )
+
+                    if (useBackend) {
                         OutlinedTextField(
-                            value = model,
-                            onValueChange = { model = it },
-                            label = { Text("Model ID") },
+                            value = backendUrl,
+                            onValueChange = { backendUrl = it },
+                            label = { Text("Backend URL") },
                             modifier = Modifier.fillMaxWidth(),
                             textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
                             singleLine = true
@@ -205,38 +256,11 @@ fun SettingsScreen(
                         checked = hapticFeedback,
                         onCheckedChange = { hapticFeedback = it }
                     )
-                    if (selectedProvider == AiProvider.OPEN_ROUTER || selectedProvider == AiProvider.GROQ) {
-                        Text(
-                            text = "Model",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        ModelDropdown(
-                            selectedModel = aiModel,
-                            isCustom = isCustomModel,
-                            onModelSelected = { selected, custom ->
-                                aiModel = selected
-                                isCustomModel = custom
-                            },
-                            expanded = modelExpanded,
-                            onExpandedChange = { modelExpanded = it },
-                            availableModels = availableModels,
-                            isLoading = isLoadingModels,
-                            defaultModel = selectedProvider.model
-                        )
-                    }
-
-                    if (selectedProvider == AiProvider.OPEN_ROUTER) {
-                        OutlinedTextField(
-                            value = backendUrl,
-                            onValueChange = { backendUrl = it },
-                            label = { Text("Custom Backend URL (optional)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
-                            singleLine = true
-                        )
-                    }
+                    SettingsToggleRow(
+                        title = "Save history",
+                        checked = saveHistory,
+                        onCheckedChange = { saveHistory = it }
+                    )
                 }
             }
 
@@ -245,13 +269,16 @@ fun SettingsScreen(
                     onSave(
                         AppSettings(
                             backendUrl = backendUrl.trim(),
-                            mode = mode,
-                            apiKey = apiKey.trim(),
-                            model = model.trim(),
+                            defaultMode = settings.defaultMode,
                             autoPaste = autoPaste,
                             autoCopyResult = autoCopyResult,
                             soundEffects = soundEffects,
-                            hapticFeedback = hapticFeedback
+                            hapticFeedback = hapticFeedback,
+                            aiProvider = selectedProvider.name,
+                            aiModel = aiModel.trim(),
+                            apiKey = apiKey.trim(),
+                            saveHistory = saveHistory,
+                            useBackend = useBackend
                         )
                     )
                 },
@@ -267,6 +294,7 @@ fun SettingsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModelDropdown(
     selectedModel: String,
@@ -277,10 +305,6 @@ private fun ModelDropdown(
     availableModels: List<String>,
     isLoading: Boolean,
     defaultModel: String
-private fun SettingsToggleRow(
-    title: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
 ) {
     var customText by remember { mutableStateOf(if (isCustom) selectedModel else "") }
 
@@ -349,6 +373,15 @@ private fun SettingsToggleRow(
                 singleLine = true
             )
         }
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
