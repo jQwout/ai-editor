@@ -11,12 +11,3 @@ data class PromptTemplate(
     val description: String = "",
     val tags: List<String> = emptyList()
 )
-
-/**
- * Category metadata.
- */
-data class PromptCategory(
-    val id: String,
-    val name: String,
-    val description: String
-)

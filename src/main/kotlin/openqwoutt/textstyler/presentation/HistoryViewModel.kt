@@ -1,7 +1,6 @@
 package openqwoutt.miniapp.textstyler.presentation
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,13 +9,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import openqwoutt.miniapp.textstyler.data.repository.InteractionRepository
 import openqwoutt.miniapp.textstyler.domain.model.Interaction
+import dev.zacsweers.metro.Inject
 
 /**
  * ViewModel for History screen.
  */
-class HistoryViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val repository = InteractionRepository(application)
+@Inject
+class HistoryViewModel(
+    private val repository: InteractionRepository
+) : ViewModel() {
 
     private val _state = MutableStateFlow(HistoryState())
     val state: StateFlow<HistoryState> = _state.asStateFlow()

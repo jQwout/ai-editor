@@ -1,6 +1,7 @@
 package openqwoutt.miniapp.textstyler.data.repository
 
 import android.content.Context
+import dev.zacsweers.metro.Inject
 import openqwoutt.miniapp.textstyler.data.local.AppDatabase
 import openqwoutt.miniapp.textstyler.data.local.InteractionEntity
 import openqwoutt.miniapp.textstyler.domain.model.Interaction
@@ -10,6 +11,7 @@ import kotlin.random.Random
 /**
  * Repository for interaction history.
  */
+@Inject
 class InteractionRepository(context: Context) {
 
     private val dao = AppDatabase.getInstance(context).interactionDao()
