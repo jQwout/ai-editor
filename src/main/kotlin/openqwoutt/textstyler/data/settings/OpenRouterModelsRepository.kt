@@ -2,55 +2,88 @@ package openqwoutt.textstyler.data.settings
 
 import android.util.Log
 import dev.zacsweers.metro.Inject
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.net.HttpURLConnection
-import java.net.URL
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.request.accept
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.isSuccess
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import openqwoutt.textprocessor.app.BuildConfig
+import java.util.concurrent.TimeUnit
 
 @Inject
 class OpenRouterModelsRepository {
 
-    suspend fun fetchModels(): Result<List<String>> = withContext(Dispatchers.IO) {
-        runCatching {
-            val url = "https://openrouter.ai/api/v1/models"
-            Log.d(TAG, "-> GET $url")
-
-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 15_000
-                readTimeout = 15_000
-                setRequestProperty("Accept", "application/json")
-            }
-
-            val responseCode = connection.responseCode
-            val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
-            val body = stream.bufferedReader(Charsets.UTF_8).use(BufferedReader::readText)
-            connection.disconnect()
-
-            Log.d(TAG, "<- Response body: $body")
-
-            if (responseCode !in 200..299) {
-                error("HTTP $responseCode: $body")
-            }
-
-            val json = JSONObject(body)
-            val data = json.getJSONArray("data")
-
-            val models = mutableListOf<String>()
-            for (i in 0 until data.length()) {
-                val item = data.getJSONObject(i)
-                val id = item.optString("id", "")
-                if (id.endsWith(":free")) {
-                    models.add(id)
+    private val client = HttpClient(OkHttp) {
+        install(ContentNegotiation) {
+            json(Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+            })
+        }
+        if (BuildConfig.DEBUG) {
+            install(Logging) {
+                logger = object : Logger {
+                    override fun log(message: String) {
+                        Log.d(TAG, message)
+                    }
                 }
+                level = LogLevel.INFO
             }
-            models
+        }
+        install(HttpRequestRetry) {
+            retryOnServerErrors(maxRetries = 2)
+            retryOnException(maxRetries = 2, retryOnTimeout = true)
+            exponentialDelay()
+        }
+        engine {
+            config {
+                connectTimeout(15, TimeUnit.SECONDS)
+                readTimeout(15, TimeUnit.SECONDS)
+            }
         }
     }
 
+    suspend fun fetchModels(): Result<List<String>> = runCatching {
+        Log.d(TAG, "-> GET $MODELS_URL")
+
+        val response = client.get(MODELS_URL) {
+            accept(ContentType.Application.Json)
+        }
+
+        if (!response.status.isSuccess()) {
+            val errorBody = runCatching { response.bodyAsText() }.getOrDefault("")
+            error("HTTP ${response.status.value}: $errorBody")
+        }
+
+        val payload: ModelsResponse = response.body()
+        payload.data
+            .mapNotNull { it.id }
+            .filter { it.endsWith(":free") }
+    }
+
+    @Serializable
+    private data class ModelsResponse(
+        val data: List<ModelEntry> = emptyList()
+    )
+
+    @Serializable
+    private data class ModelEntry(
+        val id: String? = null
+    )
+
     companion object {
         private const val TAG = "OpenRouterModels"
+        private const val MODELS_URL = "https://openrouter.ai/api/v1/models"
     }
 }

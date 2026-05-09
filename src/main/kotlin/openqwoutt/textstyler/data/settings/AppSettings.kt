@@ -1,7 +1,6 @@
 package openqwoutt.textstyler.data.settings
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 
 /**
  * Supported AI providers for text processing.
@@ -26,6 +25,26 @@ enum class AiProvider(
         requiresApiKey = true
     );
 
+    /**
+     * Heuristic: does this model id look like it belongs to this provider?
+     * Used as a sanity check before sending a request, to avoid e.g. shipping
+     * an OpenRouter model id to NVIDIA (which returns 401/403, not 404).
+     */
+    fun looksLikeOwnModel(modelId: String): Boolean {
+        if (modelId.isBlank()) return false
+        return when (this) {
+            NVIDIA -> modelId.startsWith("meta/") ||
+                modelId.startsWith("nvidia/") ||
+                modelId.startsWith("qwen/") ||
+                modelId.startsWith("mistralai/") ||
+                modelId.startsWith("google/") ||
+                modelId.startsWith("microsoft/") ||
+                modelId.startsWith("deepseek-ai/")
+            // OpenRouter is permissive: any non-empty id is acceptable.
+            OPEN_ROUTER -> true
+        }
+    }
+
     companion object {
         fun fromString(value: String): AiProvider {
             return entries.find { it.name == value } ?: OPEN_ROUTER
@@ -43,7 +62,6 @@ data class AppSettings(
     val hapticFeedback: Boolean = true,
     val aiProvider: String = AiProvider.OPEN_ROUTER.name,
     val aiModel: String = "",
-    @Transient
     val apiKey: String = "",
     val saveHistory: Boolean = true,
     val useBackend: Boolean = false

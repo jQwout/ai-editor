@@ -2,6 +2,7 @@ package openqwoutt.textstyler.di
 
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModelProvider
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Named
@@ -15,6 +16,7 @@ import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.presentation.HistoryViewModel
 import openqwoutt.miniapp.textstyler.presentation.TextStylerViewModel
 import openqwoutt.textprocessor.app.BuildConfig
+import openqwoutt.textstyler.data.settings.EncryptedPrefs
 import openqwoutt.textstyler.data.settings.OpenRouterModelsRepository
 import openqwoutt.textstyler.data.settings.SecureStorage
 import openqwoutt.textstyler.data.settings.SettingsRepository
@@ -68,14 +70,15 @@ interface AppGraph {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideSecureStorage(context: Context): SecureStorage = SecureStorage(context)
+    @Named("securePrefs")
+    fun provideSecurePrefs(context: Context): SharedPreferences =
+        EncryptedPrefs.create(context, SecureStorage.PREFS_NAME)
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideSettingsRepository(
-        context: Context,
-        secureStorage: SecureStorage
-    ): SettingsRepository = SettingsRepository(context, secureStorage)
+    @Named("settingsPrefs")
+    fun provideSettingsPrefs(context: Context): SharedPreferences =
+        EncryptedPrefs.create(context, SettingsRepository.PREFS_NAME)
 
     @Provides
     @SingleIn(AppScope::class)

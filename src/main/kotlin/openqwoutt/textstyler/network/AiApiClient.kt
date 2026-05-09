@@ -17,6 +17,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
+import io.ktor.http.headers
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -44,8 +45,7 @@ class AiApiClient {
                         Log.d(TAG, message)
                     }
                 }
-                level = LogLevel.INFO
-                sanitizeHeader { header -> header == HttpHeaders.Authorization }
+                level = LogLevel.ALL
             }
         }
         install(HttpRequestRetry) {
@@ -115,13 +115,14 @@ class AiApiClient {
         if (statusCode in 200..299) return
 
         val safeMessage = when (statusCode) {
-            401, 403 -> "$source rejected the API key. Check Settings."
+            401, 403 -> "$source rejected the request (HTTP $statusCode). Check API key and selected model in Settings."
+            404 -> "$source could not find the selected model. Pick a different model in Settings."
             429 -> "$source rate limit reached. Try again later."
             in 500..599 -> "$source is temporarily unavailable. Try again later."
             else -> "$source request failed with HTTP $statusCode."
         }
         val body = runCatching { bodyProvider() }.getOrDefault("")
-        Log.w(TAG, "$safeMessage Body length=${body.length}")
+        Log.w(TAG, "HTTP $statusCode from $source. Body: ${body.take(2000)}")
         throw AiApiException(safeMessage)
     }
 

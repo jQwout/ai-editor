@@ -148,7 +148,14 @@ fun SettingsScreen(
                                 DropdownMenuItem(
                                     text = { Text(provider.displayName, color = TextPrimary) },
                                     onClick = {
-                                        selectedProvider = provider
+                                        if (provider != selectedProvider) {
+                                            selectedProvider = provider
+                                            // Old model usually belongs to the old provider; reset
+                                            // to the new provider's default to avoid sending an
+                                            // OpenRouter model id to NVIDIA (or vice-versa).
+                                            aiModel = ""
+                                            customModelSelected = false
+                                        }
                                         providerExpanded = false
                                     }
                                 )

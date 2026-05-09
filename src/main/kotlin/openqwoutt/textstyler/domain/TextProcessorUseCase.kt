@@ -71,12 +71,29 @@ class TextProcessorUseCase(
     private suspend fun sendToOpenAiCompatibleApi(text: String, mode: StyleMode): String = withContext(Dispatchers.IO) {
         val settings = settingsRepository.load()
         val provider = settings.toAiProvider()
-        val model = settings.effectiveModel()
+        val configuredModel = settings.effectiveModel()
         val apiKey = settings.apiKey
 
         if (provider.requiresApiKey && apiKey.isBlank()) {
             error("Add ${provider.displayName} API key in Settings.")
         }
+
+        val model = if (provider.looksLikeOwnModel(configuredModel)) {
+            configuredModel
+        } else {
+            Log.w(
+                TAG,
+                "Configured model '$configuredModel' does not look like a ${provider.displayName} model; " +
+                    "falling back to ${provider.model}. Pick a matching model in Settings."
+            )
+            provider.model
+        }
+
+        Log.i(
+            TAG,
+            "Sending to ${provider.displayName} (${provider.baseUrl}) model=$model " +
+                "apiKey=${maskKey(apiKey)} (len=${apiKey.length})"
+        )
 
         val response = apiClient.chatCompletion(
             provider = provider,
@@ -90,6 +107,11 @@ class TextProcessorUseCase(
         )
 
         response.firstContent() ?: error("No response from API")
+    }
+
+    private fun maskKey(key: String): String {
+        if (key.length <= 8) return "***"
+        return key.take(6) + "..." + key.takeLast(4)
     }
 
     companion object {
