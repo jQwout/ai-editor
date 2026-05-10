@@ -1,5 +1,6 @@
 # Gradle files
 .gradle/
+.gradle-repo-home/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/**/build/
