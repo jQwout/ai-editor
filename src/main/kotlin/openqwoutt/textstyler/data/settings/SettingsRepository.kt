@@ -24,11 +24,13 @@ class SettingsRepository(
             hapticFeedback = prefs.getBoolean(KEY_HAPTIC, defaults.hapticFeedback),
             saveHistory = prefs.getBoolean(KEY_SAVE_HISTORY, defaults.saveHistory),
             useBackend = prefs.getBoolean(KEY_USE_BACKEND, defaults.useBackend),
+            useStreaming = prefs.getBoolean(KEY_USE_STREAMING, defaults.useStreaming),
             aiProvider = prefs.getString(KEY_AI_PROVIDER, defaults.aiProvider)
                 ?: defaults.aiProvider,
             aiModel = prefs.getString(KEY_AI_MODEL, defaults.aiModel)
                 ?: defaults.aiModel,
-            apiKey = apiKey
+            apiKey = apiKey,
+            isDarkTheme = prefs.getString(KEY_IS_DARK_THEME, null)?.let { it == "true" }
         )
 
         return app
@@ -44,9 +46,11 @@ class SettingsRepository(
             putBoolean(KEY_HAPTIC, settings.hapticFeedback)
             putBoolean(KEY_SAVE_HISTORY, settings.saveHistory)
             putBoolean(KEY_USE_BACKEND, settings.useBackend)
+            putBoolean(KEY_USE_STREAMING, settings.useStreaming)
             putString(KEY_AI_PROVIDER, settings.aiProvider)
             putString(KEY_AI_MODEL, settings.aiModel)
             putString(KEY_API_KEY, settings.apiKey)
+            putString(KEY_IS_DARK_THEME, settings.isDarkTheme?.toString())
             apply()
         }
     }
@@ -63,7 +67,9 @@ class SettingsRepository(
         private const val KEY_SAVE_HISTORY = "save_history"
         private const val KEY_USE_BACKEND = "use_backend"
         private const val KEY_API_KEY = "api_key"
+        private const val KEY_USE_STREAMING = "use_streaming"
         private const val KEY_AI_PROVIDER = "ai_provider"
         private const val KEY_AI_MODEL = "ai_model"
+        private const val KEY_IS_DARK_THEME = "is_dark_theme"
     }
 }

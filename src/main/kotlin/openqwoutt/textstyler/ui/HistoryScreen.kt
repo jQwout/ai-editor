@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,14 +51,6 @@ import openqwoutt.miniapp.textstyler.domain.model.InteractionStatus
 import openqwoutt.miniapp.textstyler.presentation.HistoryViewModel
 import openqwoutt.textprocessor.app.TextProcessorApplication
 
-// Telegram-style dark palette (same as TextStylerScreen)
-private val Bg = Color(0xFF0F0F0F)
-private val Surface = Color(0xFF1A1A1A)
-private val Accent = Color(0xFF8774E1)
-private val AccentSoft = Color(0xFF8774E1).copy(alpha = 0.15f)
-private val TextPrimary = Color(0xFFFFFFFF)
-private val TextSecondary = Color(0xFF8E8E93)
-private val ErrorColor = Color(0xFFF44336)
 private val SuccessColor = Color(0xFF4CAF50)
 
 /**
@@ -77,7 +70,7 @@ fun HistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Bg)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         // Header
@@ -91,13 +84,13 @@ fun HistoryScreen(
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "Back",
-                        tint = TextSecondary
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "History",
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -107,7 +100,7 @@ fun HistoryScreen(
                 TextButton(onClick = { viewModel.deleteAll() }) {
                     Text(
                         text = "Clear All",
-                        color = ErrorColor,
+                        color = MaterialTheme.colorScheme.error,
                         fontSize = 14.sp
                     )
                 }
@@ -124,7 +117,7 @@ fun HistoryScreen(
             ) {
                 Text(
                     text = "No history yet",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 16.sp
                 )
             }
@@ -161,7 +154,7 @@ private fun InteractionItem(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Surface)
+            .background(MaterialTheme.colorScheme.surface)
             .clickable { expanded = !expanded }
             .padding(12.dp)
     ) {
@@ -178,14 +171,14 @@ private fun InteractionItem(
                         Icons.Default.Refresh else Icons.Default.Error,
                     contentDescription = null,
                     tint = if (interaction.status == InteractionStatus.SUCCESS)
-                        SuccessColor else ErrorColor,
+                        SuccessColor else MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = interaction.mode.uppercase(),
                     color = if (interaction.status == InteractionStatus.SUCCESS)
-                        Accent else ErrorColor,
+                        MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -193,7 +186,7 @@ private fun InteractionItem(
 
             Text(
                 text = interaction.relativeTime,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 10.sp
             )
         }
@@ -203,7 +196,7 @@ private fun InteractionItem(
         // Preview
         Text(
             text = "\"${interaction.inputPreview}\"",
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 12.sp,
             maxLines = if (expanded) Int.MAX_VALUE else 1
         )
@@ -212,7 +205,7 @@ private fun InteractionItem(
             Text(
                 text = "→ ${interaction.outputPreview}",
                 color = if (interaction.status == InteractionStatus.SUCCESS)
-                    TextPrimary else ErrorColor,
+                    MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
                 fontSize = 12.sp,
                 maxLines = if (expanded) Int.MAX_VALUE else 1
             )
@@ -230,13 +223,13 @@ private fun InteractionItem(
                 // Full input
                 Text(
                     text = "INPUT:",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
                     text = interaction.inputText,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 12.sp
                 )
 
@@ -244,13 +237,13 @@ private fun InteractionItem(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "OUTPUT:",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = interaction.outputText,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 12.sp
                     )
                 }
@@ -262,13 +255,13 @@ private fun InteractionItem(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "ERROR:",
-                        color = ErrorColor,
+                        color = MaterialTheme.colorScheme.error,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = interaction.errorMessage,
-                        color = ErrorColor,
+                        color = MaterialTheme.colorScheme.error,
                         fontSize = 12.sp
                     )
                 }
@@ -287,7 +280,7 @@ private fun InteractionItem(
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = "Delete",
-                            tint = ErrorColor,
+                            tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(20.dp)
                         )
                     }

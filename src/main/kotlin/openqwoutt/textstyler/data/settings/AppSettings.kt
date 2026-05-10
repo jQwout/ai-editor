@@ -73,7 +73,8 @@ data class AppSettings(
     val saveHistory: Boolean = true,
     val useBackend: Boolean = false,
     val useStreaming: Boolean = true,
-    val animationType: AnimationType = AnimationType.TYPEWRITER
+    val animationType: AnimationType = AnimationType.TYPEWRITER,
+    val isDarkTheme: Boolean? = null
 ) {
     fun toAiProvider(): AiProvider = AiProvider.fromString(aiProvider)
 

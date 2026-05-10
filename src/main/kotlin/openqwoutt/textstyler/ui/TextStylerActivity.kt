@@ -9,7 +9,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import openqwoutt.miniapp.textstyler.TextStylerMiniApp
@@ -24,8 +23,7 @@ class TextStylerActivity : ComponentActivity() {
         val readOnly = intent?.getBooleanExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false) ?: false
 
         setContent {
-            MaterialTheme {
-                UnifiedTextStylerScreen(
+            UnifiedTextStylerScreen(
                     initialInputText = inputText,
                     readOnly = readOnly,
                     onFinished = { processedText ->
@@ -48,7 +46,6 @@ class TextStylerActivity : ComponentActivity() {
                         finish()
                     }
                 )
-            }
         }
     }
 }

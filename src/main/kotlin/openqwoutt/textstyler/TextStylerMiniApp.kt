@@ -3,9 +3,8 @@ package openqwoutt.miniapp.textstyler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -20,6 +19,7 @@ import openqwoutt.miniapp.textstyler.presentation.MiniAppEvent
 import openqwoutt.miniapp.textstyler.presentation.TextStylerAction
 import openqwoutt.miniapp.textstyler.presentation.TextStylerViewModel
 import openqwoutt.miniapp.textstyler.ui.TextStylerScreen
+import openqwoutt.miniapp.textstyler.ui.theme.AppTheme
 import openqwoutt.textprocessor.app.TextProcessorApplication
 
 @Composable
@@ -67,10 +67,15 @@ fun TextStylerMiniApp(
 
     val state by viewModel.state.collectAsState()
 
-    MaterialTheme(colorScheme = darkColorScheme()) {
+    val darkTheme = when (state.settings.isDarkTheme) {
+        true -> true
+        false -> false
+        null -> isSystemInDarkTheme()
+    }
+
+    AppTheme(darkTheme = darkTheme) {
         Scaffold(
-            modifier = Modifier
-                .then(modifier)
+            modifier = Modifier.then(modifier)
         ) {
             Box(modifier = Modifier.padding(it)) {
                 TextStylerScreen(

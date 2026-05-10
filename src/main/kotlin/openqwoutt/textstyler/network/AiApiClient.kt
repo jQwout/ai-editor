@@ -13,14 +13,16 @@ import io.ktor.client.request.accept
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.plugins.sse.SSE
+import io.ktor.client.plugins.sse.sse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
-import io.ktor.http.headers
+import io.ktor.http.HttpMethod
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -35,6 +37,7 @@ import java.io.IOException
 class AiApiClient {
 
     private val client = HttpClient(OkHttp) {
+        install(SSE)
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -90,32 +93,24 @@ class AiApiClient {
             stream = true
         )
 
-        val response = client.post("${provider.baseUrl}/chat/completions") {
-            contentType(ContentType.Application.Json)
-            accept(ContentType.Text.EventStream)
-            if (!apiKey.isNullOrBlank() && provider.requiresApiKey) {
-                header("Authorization", "Bearer $apiKey")
+        client.sse(
+            urlString = "${provider.baseUrl}/chat/completions",
+            request = {
+                method = HttpMethod.Post
+                contentType(ContentType.Application.Json)
+                accept(ContentType.Text.EventStream)
+                if (!apiKey.isNullOrBlank() && provider.requiresApiKey) {
+                    header("Authorization", "Bearer $apiKey")
+                }
+                setBody(request)
             }
-            setBody(request)
-        }
-
-        val channel = response.bodyAsChannel()
-        val buffer = ByteArray(8192)
-        var partialLine = ""
-
-        while (!channel.isClosedForRead) {
-            val bytesRead = channel.readAvailable(buffer)
-            if (bytesRead > 0) {
-                val chunk = String(buffer, 0, bytesRead, Charsets.UTF_8)
-                val lines = (partialLine + chunk).split("\n")
-                partialLine = lines.last()
-
-                for (i in 0 until lines.size - 1) {
-                    val line = lines[i]
-                    if (line.startsWith("data: ")) {
-                        val data = line.substring(6)
-                        if (data == "[DONE]") return@flow
-                        parseSseData(data)?.let { token -> emit(token) }
+        ) {
+            incoming.collect { event ->
+                val data = event.data
+                if (data == "[DONE]") return@collect
+                if (data != null) {
+                    parseSseData(data)?.let { token ->
+                        if (token.isNotEmpty()) emit(token)
                     }
                 }
             }
@@ -124,8 +119,8 @@ class AiApiClient {
 
     private fun parseSseData(data: String): String? {
         return try {
-            val chunk = json.decodeFromString<StreamingChoice>(data)
-            chunk.delta?.content
+            val chunk = json.decodeFromString<StreamingChunk>(data)
+            chunk.choices.firstOrNull()?.delta?.content
         } catch (e: Exception) {
             null
         }
@@ -198,6 +193,7 @@ class AiApiClient {
 
     companion object {
         private const val TAG = "AiApiClient"
+        private val json = Json { ignoreUnknownKeys = true }
     }
 }
 
@@ -219,6 +215,11 @@ data class ChatCompletionRequest(
     @SerialName("top_p")
     val topP: Double = 0.8,
     val stream: Boolean = false
+)
+
+@Serializable
+data class StreamingChunk(
+    val choices: List<StreamingChoice> = emptyList()
 )
 
 @Serializable

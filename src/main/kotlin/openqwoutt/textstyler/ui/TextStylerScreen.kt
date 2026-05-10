@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -23,7 +22,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,9 +40,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.CopyAll
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
@@ -56,16 +52,17 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -78,10 +75,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import openqwoutt.miniapp.textstyler.data.prompts.PromptCategory
@@ -90,18 +89,7 @@ import openqwoutt.miniapp.textstyler.domain.ModeGroup
 import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.presentation.TextStylerAction
 import openqwoutt.miniapp.textstyler.presentation.TextStylerState
-
-// Dark palette — purple accent
-private val Bg = Color(0xFF0F0F0F)
-private val Surface = Color(0xFF1A1A1A)
-private val CardBg = Color(0xFF1E1E1E)
-private val Accent = Color(0xFF8774E1)
-private val AccentSoft = Color(0xFF8774E1).copy(alpha = 0.15f)
-private val TextPrimary = Color(0xFFFFFFFF)
-private val TextSecondary = Color(0xFF8E8E93)
-private val Divider = Color(0xFF2C2C2E)
-private val ErrorBg = Color(0xFF3A2228)
-private val ErrorText = Color(0xFFFFC4CF)
+import openqwoutt.miniapp.textstyler.ui.theme.AppTheme
 
 private const val ANIMATION_DURATION = 250
 
@@ -207,17 +195,20 @@ private fun MainContent(
     onNavigateBack: () -> Unit,
     clipboard: ClipboardManager
 ) {
-    Box(
+    val showResult = state.result != null
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Bg)
+            .background(MaterialTheme.colorScheme.background)
             .navigationBarsPadding()
             .imePadding()
     ) {
         // Top content: header + result area
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .weight(1f)
                 .padding(horizontal = 16.dp)
         ) {
             Header(
@@ -237,54 +228,201 @@ private fun MainContent(
             }
         }
 
-        // Bottom floating section
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp)
-        ) {
-            // Mode picker cards
-            AnimatedVisibility(
-                visible = state.showModePicker,
-                enter = expandVertically(
-                    animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
-                ) + fadeIn(tween(ANIMATION_DURATION)),
-                exit = shrinkVertically(
-                    animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
-                ) + fadeOut(tween(ANIMATION_DURATION))
+        if (showResult) {
+            // FAB for new request
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                contentAlignment = Alignment.CenterEnd
             ) {
-                ModePicker(
-                    selectedMode = state.selectedMode,
-                    onSelectMode = { mode ->
-                        onAction(TextStylerAction.SelectMode(mode))
-                        onAction(TextStylerAction.HideModePicker)
-                    }
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        onAction(TextStylerAction.ClearResult)
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null
+                        )
+                    },
+                    text = { Text("New request") },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White
                 )
             }
-
-            // Style sub-modes strip
-            AnimatedVisibility(
-                visible = (state.selectedMode == StyleMode.STYLE || state.selectedMode.group == ModeGroup.STYLE) && !state.showModePicker,
-                enter = expandVertically(
-                    animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
-                ) + fadeIn(tween(ANIMATION_DURATION)),
-                exit = shrinkVertically(
-                    animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
-                ) + fadeOut(tween(ANIMATION_DURATION))
+        } else {
+            // Bottom section: mode picker + input card
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp)
             ) {
-                StyleSubModesStrip(
-                    selectedMode = state.selectedMode,
-                    onSelectMode = { onAction(TextStylerAction.SelectMode(it)) }
+                // Mode picker cards
+                AnimatedVisibility(
+                    visible = state.showModePicker,
+                    enter = expandVertically(
+                        animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                    ) + fadeIn(tween(ANIMATION_DURATION)),
+                    exit = shrinkVertically(
+                        animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                    ) + fadeOut(tween(ANIMATION_DURATION))
+                ) {
+                    ModePicker(
+                        selectedMode = state.selectedMode,
+                        onSelectMode = { mode ->
+                            onAction(TextStylerAction.SelectMode(mode))
+                            onAction(TextStylerAction.HideModePicker)
+                        }
+                    )
+                }
+
+                // Style sub-modes strip
+                AnimatedVisibility(
+                    visible = (state.selectedMode == StyleMode.STYLE || state.selectedMode.group == ModeGroup.STYLE) && !state.showModePicker,
+                    enter = expandVertically(
+                        animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                    ) + fadeIn(tween(ANIMATION_DURATION)),
+                    exit = shrinkVertically(
+                        animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                    ) + fadeOut(tween(ANIMATION_DURATION))
+                ) {
+                    StyleSubModesStrip(
+                        selectedMode = state.selectedMode,
+                        onSelectMode = { onAction(TextStylerAction.SelectMode(it)) }
+                    )
+                }
+
+                InputCard(
+                    state = state,
+                    onAction = onAction,
+                    clipboard = clipboard
                 )
             }
-
-            InputCard(
-                state = state,
-                onAction = onAction,
-                clipboard = clipboard
-            )
         }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun MainContentPreview_Default() {
+    val context = LocalContext.current
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    AppTheme(darkTheme = true) {
+        MainContent(
+            state = TextStylerState(),
+            onAction = {},
+            onNavigateBack = {},
+            clipboard = clipboard
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun MainContentPreview_WithResult() {
+    val context = LocalContext.current
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    AppTheme(darkTheme = true) {
+        MainContent(
+            state = TextStylerState(
+                inputText = "The quick brown fox jumps over the lazy dog.",
+                result = "A swift auburn canine leaps across a lethargic hound.",
+                selectedMode = StyleMode.FORMAL
+            ),
+            onAction = {},
+            onNavigateBack = {},
+            clipboard = clipboard
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun MainContentPreview_Loading() {
+    val context = LocalContext.current
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    AppTheme(darkTheme = true) {
+        MainContent(
+            state = TextStylerState(
+                inputText = "Processing this text...",
+                isLoading = true
+            ),
+            onAction = {},
+            onNavigateBack = {},
+            clipboard = clipboard
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun MainContentPreview_Error() {
+    val context = LocalContext.current
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    AppTheme(darkTheme = true) {
+        MainContent(
+            state = TextStylerState(
+                inputText = "Some text",
+                error = "Network error. Please check your connection and try again."
+            ),
+            onAction = {},
+            onNavigateBack = {},
+            clipboard = clipboard
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun MainContentPreview_ModePickerOpen() {
+    val context = LocalContext.current
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    AppTheme(darkTheme = true) {
+        MainContent(
+            state = TextStylerState(
+                inputText = "Type or paste text...",
+                showModePicker = true
+            ),
+            onAction = {},
+            onNavigateBack = {},
+            clipboard = clipboard
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun MainContentPreview_LongText() {
+    val context = LocalContext.current
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val longInput = buildString {
+        repeat(8) {
+            append("The quick brown fox jumps over the lazy dog. ")
+            append("Artificial intelligence is transforming the way we write, code, and communicate. ")
+            append("Jetpack Compose makes building modern Android UIs faster and more intuitive. ")
+        }
+    }
+    val longResult = buildString {
+        repeat(6) {
+            append("A swift auburn canine leaps across a lethargic hound. ")
+            append("Machine learning algorithms continuously improve natural language understanding. ")
+            append("Declarative UI frameworks reduce boilerplate and increase developer productivity. ")
+        }
+    }
+    AppTheme(darkTheme = true) {
+        MainContent(
+            state = TextStylerState(
+                inputText = longInput,
+                result = longResult,
+                selectedMode = StyleMode.ANALYZE,
+                isTextTruncated = true
+            ),
+            onAction = {},
+            onNavigateBack = {},
+            clipboard = clipboard
+        )
     }
 }
 
@@ -309,21 +447,21 @@ private fun Header(
                 Icon(
                     imageVector = Icons.Default.Menu,
                     contentDescription = "Menu",
-                    tint = TextSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             DropdownMenu(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false },
-                containerColor = Surface,
-                modifier = Modifier.background(Surface)
+                containerColor = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
                 DropdownMenuItem(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.History, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("History", color = TextPrimary)
+                            Text("History", color = MaterialTheme.colorScheme.onSurface)
                         }
                     },
                     onClick = { showMenu = false; onShowHistory() }
@@ -331,9 +469,9 @@ private fun Header(
                 DropdownMenuItem(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Settings, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Settings", color = TextPrimary)
+                            Text("Settings", color = MaterialTheme.colorScheme.onSurface)
                         }
                     },
                     onClick = { showMenu = false; onShowSettings() }
@@ -344,7 +482,7 @@ private fun Header(
         // Title
         Text(
             text = "AI Editor",
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 18.sp,
             fontWeight = FontWeight.SemiBold
         )
@@ -354,7 +492,7 @@ private fun Header(
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
-                .background(Accent),
+                .background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -392,15 +530,15 @@ private fun ModePicker(
             ) {
                 rowModes.forEach { (mode, subtitle) ->
                     val isSelected = selectedMode == mode ||
-                        (mode == StyleMode.STYLE && selectedMode.group == ModeGroup.STYLE)
+                            (mode == StyleMode.STYLE && selectedMode.group == ModeGroup.STYLE)
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) AccentSoft else CardBg)
+                            .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant)
                             .border(
                                 width = if (isSelected) 1.dp else 0.dp,
-                                color = if (isSelected) Accent else Color.Transparent,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                                 shape = RoundedCornerShape(16.dp)
                             )
                             .clickable { onSelectMode(mode) }
@@ -409,19 +547,19 @@ private fun ModePicker(
                         Text(
                             text = mode.icon,
                             fontSize = 22.sp,
-                            color = if (isSelected) Accent else TextPrimary
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = mode.displayName,
-                            color = TextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = subtitle,
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
                     }
@@ -442,7 +580,7 @@ private fun StyleSubModesStrip(
     Column(modifier = Modifier.padding(bottom = 10.dp)) {
         Text(
             text = "STYLE",
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             letterSpacing = 1.sp
@@ -459,10 +597,10 @@ private fun StyleSubModesStrip(
                     modifier = Modifier
                         .size(width = 56.dp, height = 64.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (selected) Accent.copy(alpha = 0.12f) else CardBg)
+                        .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant)
                         .border(
                             width = if (selected) 1.5.dp else 0.dp,
-                            color = if (selected) Accent else Color.Transparent,
+                            color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
                             shape = RoundedCornerShape(12.dp)
                         )
                         .clickable { onSelectMode(mode) }
@@ -471,14 +609,14 @@ private fun StyleSubModesStrip(
                     Text(
                         text = mode.icon,
                         fontSize = 18.sp,
-                        color = if (selected) Accent else TextPrimary,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = mode.shortName,
                         fontSize = 10.sp,
-                        color = if (selected) Accent else TextSecondary
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -492,31 +630,34 @@ private fun InputCard(
     onAction: (TextStylerAction) -> Unit,
     clipboard: ClipboardManager
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(Surface)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(16.dp)
     ) {
         // Mode pill
-        val pillLabel = if (state.selectedMode == StyleMode.STYLE || state.selectedMode.group == ModeGroup.STYLE) "Style" else state.selectedMode.shortName
-        val pillIcon = if (state.selectedMode == StyleMode.STYLE || state.selectedMode.group == ModeGroup.STYLE) "✎" else state.selectedMode.icon
+        val pillLabel =
+            if (state.selectedMode == StyleMode.STYLE || state.selectedMode.group == ModeGroup.STYLE) "Style" else state.selectedMode.shortName
+        val pillIcon =
+            if (state.selectedMode == StyleMode.STYLE || state.selectedMode.group == ModeGroup.STYLE) "✎" else state.selectedMode.icon
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
-                    .background(AccentSoft)
-                    .border(1.dp, Accent.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = pillIcon, fontSize = 14.sp, color = Accent)
+                    Text(text = pillIcon, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = pillLabel,
-                        color = Accent,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -534,11 +675,11 @@ private fun InputCard(
                 .fillMaxWidth()
                 .heightIn(min = 48.dp, max = 140.dp),
             textStyle = TextStyle(
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 lineHeight = 22.sp
             ),
-            cursorBrush = SolidColor(Accent),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Sentences,
                 imeAction = ImeAction.Done
@@ -548,7 +689,7 @@ private fun InputCard(
                     if (state.inputText.isEmpty()) {
                         Text(
                             text = "Type or paste text...",
-                            color = TextSecondary.copy(alpha = 0.6f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             fontSize = 16.sp
                         )
                     }
@@ -569,17 +710,17 @@ private fun InputCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(ErrorBg)
+                        .background(MaterialTheme.colorScheme.errorContainer)
                         .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(error, color = ErrorText, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    Text(error, color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 13.sp, modifier = Modifier.weight(1f))
                     TextButton(
                         onClick = { onAction(TextStylerAction.ClearError) },
                         contentPadding = PaddingValues(0.dp)
                     ) {
-                        Text("OK", color = ErrorText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text("OK", color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -599,15 +740,15 @@ private fun InputCard(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(CardBg)
-                        .border(1.dp, Divider, RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
                         .clickable { onAction(TextStylerAction.ToggleModePicker) },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = if (state.showModePicker) Icons.Default.Close else Icons.Default.Add,
                         contentDescription = if (state.showModePicker) "Close" else "Choose mode",
-                        tint = TextSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -617,15 +758,15 @@ private fun InputCard(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(CardBg)
-                        .border(1.dp, Divider, RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
                         .clickable { onAction(TextStylerAction.ShowTemplates) },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Tune,
                         contentDescription = "Templates",
-                        tint = TextSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -636,8 +777,15 @@ private fun InputCard(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (state.isLoading) Accent.copy(alpha = 0.4f) else Accent)
-                    .clickable(enabled = !state.isLoading) {
+                    .background(
+                        if (state.isLoading || state.inputText.isBlank()) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                    )
+                    .clickable(enabled = !state.isLoading && state.inputText.isNotBlank()) {
+                        keyboardController?.hide()
                         onAction(TextStylerAction.ProcessText)
                     },
                 contentAlignment = Alignment.Center
@@ -667,13 +815,13 @@ private fun ResultArea(
     clipboard: ClipboardManager,
     onAction: (TextStylerAction) -> Unit
 ) {
-    if (state.result != null) {
+    if (state.result != null || state.isStreaming) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp, bottom = 8.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(Surface)
+                .background(MaterialTheme.colorScheme.surface)
                 .padding(16.dp)
         ) {
             Row(
@@ -683,7 +831,7 @@ private fun ResultArea(
             ) {
                 Text(
                     text = state.selectedMode.displayName,
-                    color = Accent,
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -697,7 +845,7 @@ private fun ResultArea(
                         Icon(
                             imageVector = Icons.Default.CopyAll,
                             contentDescription = "Copy",
-                            tint = Accent,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -708,7 +856,7 @@ private fun ResultArea(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Clear",
-                            tint = TextSecondary,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -720,15 +868,15 @@ private fun ResultArea(
             if (state.isTextTruncated) {
                 Text(
                     "Input was trimmed to 3000 characters.",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
             }
 
             Text(
-                text = state.result,
-                color = TextPrimary,
+                text = if (state.isStreaming) state.resultTokens else state.result ?: "",
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 lineHeight = 22.sp
             )
@@ -740,13 +888,13 @@ private fun ResultArea(
                 .height(120.dp)
                 .padding(top = 8.dp, bottom = 8.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(Surface),
+                .background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center
         ) {
             CircularProgressIndicator(
                 modifier = Modifier.size(32.dp),
                 strokeWidth = 3.dp,
-                color = Accent
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
@@ -761,8 +909,8 @@ private fun BottomActions(state: TextStylerState, onApply: () -> Unit) {
             .height(52.dp),
         enabled = !state.isLoading,
         colors = ButtonDefaults.buttonColors(
-            containerColor = Accent,
-            disabledContainerColor = Accent.copy(alpha = 0.4f)
+            containerColor = MaterialTheme.colorScheme.primary,
+            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
         ),
         shape = RoundedCornerShape(24.dp)
     ) {
@@ -793,14 +941,14 @@ private fun SettingsToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Bg)
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = title,
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 16.sp
         )
         Switch(
@@ -808,9 +956,9 @@ private fun SettingsToggleRow(
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = Accent,
-                uncheckedThumbColor = TextSecondary,
-                uncheckedTrackColor = Surface
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surface
             )
         )
     }
@@ -833,7 +981,7 @@ fun TemplatesSheet(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Bg)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Row(
             modifier = Modifier
@@ -846,12 +994,12 @@ fun TemplatesSheet(
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = "Close",
-                    tint = TextSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
                 text = "AI Templates",
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold
             )
@@ -859,7 +1007,7 @@ fun TemplatesSheet(
                 TextButton(onClick = onClear) {
                     Text(
                         text = "Clear",
-                        color = Accent,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 14.sp
                     )
                 }
@@ -877,9 +1025,9 @@ fun TemplatesSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            placeholder = { Text("Search templates...", color = TextSecondary) },
+            placeholder = { Text("Search templates...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary)
+                Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             trailingIcon = {
                 if (searchText.isNotEmpty()) {
@@ -887,15 +1035,15 @@ fun TemplatesSheet(
                         searchText = ""
                         onSearch("")
                     }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = TextSecondary)
+                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Accent,
-                unfocusedBorderColor = Surface,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.surface,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
             shape = RoundedCornerShape(12.dp),
             singleLine = true
@@ -913,7 +1061,7 @@ fun TemplatesSheet(
                 onClick = { onSelectCategory(null) },
                 label = { Text("All") },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Accent,
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
                     selectedLabelColor = Color.White
                 )
             )
@@ -923,7 +1071,7 @@ fun TemplatesSheet(
                     onClick = { onSelectCategory(cat.id) },
                     label = { Text(cat.name) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Accent,
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = Color.White
                     )
                 )
@@ -949,28 +1097,28 @@ fun TemplatesSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) AccentSoft else CardBg)
+                        .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant)
                         .padding(12.dp)
                         .then(Modifier.clickable { onSelect(template) })
                 ) {
                     Column {
                         Text(
                             text = template.name,
-                            color = if (isSelected) Accent else TextPrimary,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium
                         )
                         if (template.description.isNotBlank()) {
                             Text(
                                 text = template.description,
-                                color = TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp
                             )
                         }
                         if (template.tags.isNotEmpty()) {
                             Text(
                                 text = template.tags.joinToString(", "),
-                                color = Accent.copy(alpha = 0.7f),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                                 fontSize = 10.sp,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
@@ -981,5 +1129,75 @@ fun TemplatesSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun TextStylerScreenPreview_Default() {
+    AppTheme(darkTheme = true) {
+        TextStylerScreen(
+            state = TextStylerState(),
+            onAction = {},
+            onNavigateBack = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun TextStylerScreenPreview_WithResult() {
+    AppTheme(darkTheme = true) {
+        TextStylerScreen(
+            state = TextStylerState(
+                inputText = "The quick brown fox jumps over the lazy dog.",
+                result = "A swift auburn canine leaps across a lethargic hound.",
+                selectedMode = StyleMode.FORMAL
+            ),
+            onAction = {},
+            onNavigateBack = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun TextStylerScreenPreview_Loading() {
+    AppTheme(darkTheme = true) {
+        TextStylerScreen(
+            state = TextStylerState(
+                inputText = "Processing this text...",
+                isLoading = true
+            ),
+            onAction = {},
+            onNavigateBack = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun TextStylerScreenPreview_Error() {
+    AppTheme(darkTheme = true) {
+        TextStylerScreen(
+            state = TextStylerState(
+                inputText = "Some text",
+                error = "Network error. Please check your connection and try again."
+            ),
+            onAction = {},
+            onNavigateBack = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F0F)
+@Composable
+private fun TextStylerScreenPreview_SettingsOpen() {
+    AppTheme(darkTheme = true) {
+        TextStylerScreen(
+            state = TextStylerState(showSettings = true),
+            onAction = {},
+            onNavigateBack = {}
+        )
     }
 }

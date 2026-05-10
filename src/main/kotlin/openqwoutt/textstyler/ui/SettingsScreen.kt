@@ -47,12 +47,6 @@ import androidx.compose.ui.unit.dp
 import openqwoutt.textstyler.data.settings.AiProvider
 import openqwoutt.textstyler.data.settings.AppSettings
 
-private val AppBg = Color(0xFF0D0D11)
-private val Panel = Color(0xFF1B1B20)
-private val PanelLight = Color(0xFF23232A)
-private val Accent = Color(0xFF8D78F0)
-private val TextPrimary = Color(0xFFF4F1F8)
-private val TextSecondary = Color(0xFFB9B5C3)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,10 +72,18 @@ fun SettingsScreen(
     var saveHistory by remember(settings.saveHistory) { mutableStateOf(settings.saveHistory) }
     var useBackend by remember(settings.useBackend) { mutableStateOf(settings.useBackend) }
     var useStreaming by remember(settings.useStreaming) { mutableStateOf(settings.useStreaming) }
+    var isDarkTheme by remember(settings.isDarkTheme) { mutableStateOf(settings.isDarkTheme) }
+    var themeExpanded by remember { mutableStateOf(false) }
+
+    val themeOptions = listOf(
+        "System" to null,
+        "Light" to false,
+        "Dark" to true
+    )
 
     Surface(
         modifier = Modifier.fillMaxSize().systemBarsPadding().imePadding(),
-        color = AppBg
+        color = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier
@@ -98,20 +100,20 @@ fun SettingsScreen(
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = TextPrimary
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Settings",
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
             }
 
             Surface(
-                color = Panel,
+                color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -121,7 +123,7 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = "AI Provider",
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
 
@@ -138,16 +140,16 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .menuAnchor(),
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary)
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface)
                         )
                         ExposedDropdownMenu(
                             expanded = providerExpanded,
                             onDismissRequest = { providerExpanded = false },
-                            modifier = Modifier.background(PanelLight)
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             AiProvider.entries.forEach { provider ->
                                 DropdownMenuItem(
-                                    text = { Text(provider.displayName, color = TextPrimary) },
+                                    text = { Text(provider.displayName, color = MaterialTheme.colorScheme.onSurface) },
                                     onClick = {
                                         if (provider != selectedProvider) {
                                             selectedProvider = provider
@@ -170,7 +172,7 @@ fun SettingsScreen(
                             onValueChange = { apiKey = it },
                             label = { Text("${selectedProvider.displayName} API Key") },
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation()
                         )
@@ -179,7 +181,7 @@ fun SettingsScreen(
                     if (selectedProvider == AiProvider.OPEN_ROUTER || selectedProvider == AiProvider.NVIDIA) {
                         Text(
                             text = "Model",
-                            color = TextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold
                         )
 
@@ -224,7 +226,7 @@ fun SettingsScreen(
                             onValueChange = { backendUrl = it },
                             label = { Text("Backend URL") },
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                             singleLine = true
                         )
                     }
@@ -232,7 +234,7 @@ fun SettingsScreen(
             }
 
             Surface(
-                color = Panel,
+                color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -242,7 +244,7 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = "Preferences",
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                     SettingsToggleRow(
@@ -275,6 +277,49 @@ fun SettingsScreen(
                         checked = useStreaming,
                         onCheckedChange = { useStreaming = it }
                     )
+
+                    Text(
+                        text = "Theme",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+
+                    ExposedDropdownMenuBox(
+                        expanded = themeExpanded,
+                        onExpandedChange = { themeExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = themeOptions.find { it.second == isDarkTheme }?.first ?: "System",
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                        ExposedDropdownMenu(
+                            expanded = themeExpanded,
+                            onDismissRequest = { themeExpanded = false },
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            themeOptions.forEach { (label, value) ->
+                                DropdownMenuItem(
+                                    text = { Text(label, color = MaterialTheme.colorScheme.onSurface) },
+                                    onClick = {
+                                        isDarkTheme = value
+                                        themeExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -293,14 +338,15 @@ fun SettingsScreen(
                             apiKey = apiKey.trim(),
                             saveHistory = saveHistory,
                             useBackend = useBackend,
-                            useStreaming = useStreaming
+                            useStreaming = useStreaming,
+                            isDarkTheme = isDarkTheme
                         )
                     )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(28.dp)
             ) {
                 Text("Save Settings", color = Color.White, fontWeight = FontWeight.Bold)
@@ -332,10 +378,10 @@ private fun ModelDropdown(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text("Loading models...", color = TextSecondary)
+                Text("Loading models...", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else if (availableModels.isEmpty()) {
-            Text("Using default model: $defaultModel", color = TextSecondary)
+            Text("Using default model: $defaultModel", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         ExposedDropdownMenuBox(
@@ -351,16 +397,16 @@ private fun ModelDropdown(
                 modifier = Modifier
                     .fillMaxWidth()
                     .menuAnchor(),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary)
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface)
             )
             ExposedDropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { onExpandedChange(false) },
-                modifier = Modifier.background(PanelLight)
+                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 availableModels.forEach { model ->
                     DropdownMenuItem(
-                        text = { Text(model, color = TextPrimary) },
+                        text = { Text(model, color = MaterialTheme.colorScheme.onSurface) },
                         onClick = {
                             onModelSelected(model, false)
                             onExpandedChange(false)
@@ -368,7 +414,7 @@ private fun ModelDropdown(
                     )
                 }
                 DropdownMenuItem(
-                    text = { Text("Custom...", color = TextPrimary) },
+                    text = { Text("Custom...", color = MaterialTheme.colorScheme.onSurface) },
                     onClick = {
                         onModelSelected(customText, true)
                         onExpandedChange(false)
@@ -386,7 +432,7 @@ private fun ModelDropdown(
                 },
                 label = { Text("Custom model ID") },
                 modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                 singleLine = true
             )
         }
@@ -404,7 +450,7 @@ private fun SettingsToggleRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = title, color = TextSecondary)
+        Text(text = title, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange

@@ -11,7 +11,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import openqwoutt.miniapp.textstyler.TextStylerMiniApp
@@ -65,7 +64,6 @@ class VoiceAssistActivity : ComponentActivity() {
 
     private fun showUnifiedScreen(inputText: String) {
         setContent {
-            MaterialTheme {
                 TextStylerMiniApp(
                     initialInputText = inputText,
                     onNavigateBack = { finish() },
@@ -78,7 +76,6 @@ class VoiceAssistActivity : ComponentActivity() {
                     closeBehavior = CloseBehavior.CopyToClipboard,
                     modifier = Modifier.fillMaxSize()
                 )
-            }
         }
     }
 }

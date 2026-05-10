@@ -19,7 +19,6 @@ import openqwoutt.miniapp.textstyler.data.prompts.PromptCategory
 import openqwoutt.miniapp.textstyler.data.prompts.PromptRepository
 import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
 import openqwoutt.miniapp.textstyler.domain.StyleMode
-import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.domain.TextStylerResult
 import openqwoutt.textstyler.data.settings.AppSettings
 import openqwoutt.textstyler.data.settings.OpenRouterModelsCache
@@ -47,7 +46,7 @@ data class TextStylerState(
     val showHistory: Boolean = false,
     val showModePicker: Boolean = false,
     val result: String? = null,
-    val resultTokens: List<String> = emptyList(),
+    val resultTokens: String = "",
     val isLoading: Boolean = false,
     val isStreaming: Boolean = false,
     val error: String? = null,
@@ -209,7 +208,7 @@ class TextStylerViewModel(
         }
 
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null, result = null, resultTokens = emptyList()) }
+            _state.update { it.copy(isLoading = true, error = null, result = null, resultTokens ="") }
 
             val useStreaming = currentState.settings.useStreaming && !currentState.settings.useBackend
 
@@ -260,8 +259,9 @@ class TextStylerViewModel(
                         }
                         is StreamingResult.Token -> {
                             accumulated.append(streamingResult.text)
+                            val newState = accumulated.toString()
                             _state.update {
-                                it.copy(resultTokens = accumulated.toString().split("").filter { it.isNotEmpty() })
+                                it.copy(resultTokens = newState)
                             }
                         }
                         is StreamingResult.Done -> {
@@ -292,7 +292,7 @@ class TextStylerViewModel(
                             it.copy(
                                 isLoading = false,
                                 result = result.result,
-                                resultTokens = result.result.split("").filter { it.isNotEmpty() },
+                                resultTokens = result.result,
                                 isTextTruncated = currentState.inputText.length > 3000
                             )
                         }
