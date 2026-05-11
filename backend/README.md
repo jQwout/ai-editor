@@ -28,9 +28,16 @@ $env:NVIDIA_API_KEY="nvapi-..."
 - `LLM_PROVIDER` — `openrouter` (по умолчанию) или `nvidia` / `nim`.
 - Для prompt proxy модель по умолчанию: `LLM_PROMPT_PROXY_MODEL` или устаревшее `OPENROUTER_PROMPT_PROXY_MODEL`, иначе `OPENROUTER_MODEL` / `NVIDIA_MODEL` в зависимости от провайдера.
 
+### Prompt proxy: `POST /api/prompt/proxy`
+
+Тело JSON: `style`, `prompt`, `language`, опционально `model`, опционально **`stream`** (по умолчанию `false`).
+
+- **`stream: false` или поле не передано** — ответ `200` с JSON `{"result":"..."}`.
+- **`stream: true`** — ответ `Content-Type: text/event-stream` (SSE). Строки `data:` с JSON `{"text":"<дельта>"}`; в конце при успехе — `event: done` и `data: {}`. Ошибка валидации до вызова LLM — по-прежнему **`400` + JSON** с полем `error`. Ошибка upstream при стриминге — **`event: error`** и в `data` JSON того же вида, что и для нестриминговых ошибок (в т.ч. полное тело провайдера в `providerRaw` при неуспешном HTTP).
+
 ### Тесты (`:backend:test`)
 
-Юнит‑тесты: `ChatCompletionsLlmAdapter`, конфиги OpenRouter/NVIDIA, `ProcessTextUseCase`, `TextProcessingRoutes`, обрезка диагностик.
+Юнит‑тесты: `ChatCompletionsLlmAdapter`, `ChatCompletionsPromptProxyCompleter` (sync + mock SSE), `PromptProxyService`, `PromptProxyRoutes`, конфиги OpenRouter/NVIDIA, `ProcessTextUseCase`, `TextProcessingRoutes`, обрезка диагностик.
 
 ```powershell
 .\gradlew.bat :backend:test

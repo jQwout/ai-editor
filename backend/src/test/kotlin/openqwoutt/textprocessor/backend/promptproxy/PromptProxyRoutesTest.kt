@@ -10,8 +10,12 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
+import io.ktor.client.statement.bodyAsText
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -29,6 +33,7 @@ class PromptProxyRoutesTest {
 
     private class FakeCompleter(
         private val result: LlmAttemptResult,
+        private val streamFlow: Flow<ProxyStreamFrame> = emptyFlow(),
         var lastSeenModelId: String? = null,
     ) : PromptProxyLlmCompleter {
         override suspend fun completeChat(
@@ -40,15 +45,26 @@ class PromptProxyRoutesTest {
             lastSeenModelId = model
             return result
         }
+
+        override fun streamChat(
+            model: String,
+            messages: List<ChatMessage>,
+            temperature: Double,
+            maxTokens: Int,
+        ): Flow<ProxyStreamFrame> {
+            lastSeenModelId = model
+            return streamFlow
+        }
     }
 
     private fun testRouting(
         completerResult: LlmAttemptResult,
         serverDefaultModel: String = "test/default-model",
+        streamFlow: Flow<ProxyStreamFrame> = emptyFlow(),
         block: suspend io.ktor.client.HttpClient.(FakeCompleter) -> Unit,
     ) {
         testApplication {
-            val completer = FakeCompleter(completerResult)
+            val completer = FakeCompleter(completerResult, streamFlow = streamFlow)
             application {
                 install(ServerContentNegotiation) { json(json) }
                 routing {
@@ -212,5 +228,199 @@ class PromptProxyRoutesTest {
             assertEquals(HttpStatusCode.BadRequest, res.status)
             val envelope = res.body<PromptProxyErrorEnvelope>()
             assertTrue(envelope.error.message.contains("model", ignoreCase = true))
+        }
+
+    @Test
+    fun `stream true returns sse chunks and done`() =
+        testRouting(
+            completerResult = LlmAttemptResult.Success("unused"),
+            streamFlow =
+                flowOf(
+                    ProxyStreamFrame.Delta("hel"),
+                    ProxyStreamFrame.Delta("lo"),
+                ),
+        ) {
+                _ ->
+            val res =
+                post("/api/prompt/proxy") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        PromptProxyRequest(
+                            style = "s",
+                            prompt = "x",
+                            language = "en",
+                            stream = true,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, res.status)
+            assertTrue(res.headers["Content-Type"]?.startsWith("text/event-stream") == true)
+            val text = res.bodyAsText()
+            assertTrue(text.contains(""""text":"hel""""))
+            assertTrue(text.contains(""""text":"lo""""))
+            assertTrue(text.contains("event: done"))
+        }
+
+    @Test
+    fun `stream true emits error frame when upstream fails`() =
+        testRouting(
+            completerResult = LlmAttemptResult.Success("unused"),
+            streamFlow =
+                flowOf(
+                    ProxyStreamFrame.Failed(
+                        PromptProxyErrorDetail(
+                            message = "upstream",
+                            provider = "openrouter",
+                            httpStatus = 500,
+                            providerRaw = """{"err":true}""",
+                        ),
+                    ),
+                ),
+        ) {
+                _ ->
+            val res =
+                post("/api/prompt/proxy") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        PromptProxyRequest(
+                            style = "",
+                            prompt = "x",
+                            language = "en",
+                            stream = true,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, res.status)
+            val text = res.bodyAsText()
+            assertTrue(text.contains("event: error"))
+            assertTrue(text.contains("upstream"))
+            assertTrue(text.contains("providerRaw"))
+            assertTrue(!text.contains("event: done"))
+        }
+
+    @Test
+    fun `stream true blank prompt returns 400 json not sse`() =
+        testRouting(completerResult = LlmAttemptResult.Success("x")) {
+                _ ->
+            val res =
+                post("/api/prompt/proxy") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        PromptProxyRequest(
+                            style = "a",
+                            prompt = "   ",
+                            language = "en",
+                            stream = true,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.BadRequest, res.status)
+            assertTrue(
+                res.headers["Content-Type"]?.contains("application/json", ignoreCase = true) == true,
+                "validation errors must stay JSON, not SSE",
+            )
+            val envelope = res.body<PromptProxyErrorEnvelope>()
+            assertTrue(envelope.error.message.contains("prompt", ignoreCase = true))
+        }
+
+    @Test
+    fun `stream false explicit uses json sync response`() =
+        testRouting(completerResult = LlmAttemptResult.Success("SYNC")) {
+                _ ->
+            val res =
+                post("/api/prompt/proxy") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        PromptProxyRequest(
+                            style = "",
+                            prompt = "ok",
+                            language = "en",
+                            stream = false,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, res.status)
+            assertEquals("SYNC", res.body<PromptProxySuccessResponse>().result)
+        }
+
+    @Test
+    fun `stream true empty upstream flow still ends with done`() =
+        testRouting(
+            completerResult = LlmAttemptResult.Success("unused"),
+            streamFlow = emptyFlow(),
+        ) {
+                _ ->
+            val res =
+                post("/api/prompt/proxy") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        PromptProxyRequest(
+                            style = "x",
+                            prompt = "y",
+                            language = "en",
+                            stream = true,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, res.status)
+            val text = res.bodyAsText()
+            assertTrue(text.contains("event: done"))
+        }
+
+    @Test
+    fun `stream true uses client model id`() =
+        testRouting(
+            completerResult = LlmAttemptResult.Success("unused"),
+            streamFlow = flowOf(ProxyStreamFrame.Delta("a")),
+            serverDefaultModel = "server/m",
+        ) {
+                completer ->
+            val res =
+                post("/api/prompt/proxy") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        PromptProxyRequest(
+                            style = "",
+                            prompt = "p",
+                            language = "en",
+                            model = "  my/model  ",
+                            stream = true,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, res.status)
+            assertEquals("my/model", completer.lastSeenModelId)
+        }
+
+    @Test
+    fun `stream true then failed does not append done`() =
+        testRouting(
+            completerResult = LlmAttemptResult.Success("unused"),
+            streamFlow =
+                flowOf(
+                    ProxyStreamFrame.Delta("x"),
+                    ProxyStreamFrame.Failed(
+                        PromptProxyErrorDetail(message = "mid", provider = "p", httpStatus = 400, providerRaw = "raw"),
+                    ),
+                ),
+        ) {
+                _ ->
+            val res =
+                post("/api/prompt/proxy") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        PromptProxyRequest(
+                            style = "",
+                            prompt = "p",
+                            language = "en",
+                            stream = true,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, res.status)
+            val text = res.bodyAsText()
+            assertTrue(text.contains(""""text":"x""""))
+            assertTrue(text.contains("event: error"))
+            assertTrue(!text.contains("event: done"))
         }
 }

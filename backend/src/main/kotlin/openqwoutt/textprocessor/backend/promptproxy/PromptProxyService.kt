@@ -1,5 +1,6 @@
 package openqwoutt.textprocessor.backend.promptproxy
 
+import kotlinx.coroutines.flow.Flow
 import openqwoutt.textprocessor.backend.shared.openrouter.ChatMessage
 
 class PromptProxyService(
@@ -9,6 +10,52 @@ class PromptProxyService(
 ) {
 
     suspend fun run(request: PromptProxyRequest): PromptProxyRunOutcome {
+        when (val validated = validateRequest(request)) {
+            is PromptProxyValidateResult.Err ->
+                return PromptProxyRunOutcome.Validation(validated.detail)
+            is PromptProxyValidateResult.Ok -> {
+                val outcome =
+                    llm.completeChat(
+                        model = validated.routingModel,
+                        messages = validated.messages,
+                        temperature = DEFAULT_TEMPERATURE,
+                        maxTokens = DEFAULT_MAX_TOKENS,
+                    )
+
+                return when (outcome) {
+                    is LlmAttemptResult.Success -> PromptProxyRunOutcome.Ok(outcome.text)
+                    is LlmAttemptResult.Failure ->
+                        PromptProxyRunOutcome.Provider(
+                            PromptProxyErrorDetail(
+                                message = outcome.message,
+                                provider = outcome.provider,
+                                httpStatus = outcome.httpStatus,
+                                providerBody = outcome.providerBody,
+                                providerRaw = outcome.providerRaw,
+                            ),
+                        )
+                }
+            }
+        }
+    }
+
+    /** Validates and returns a flow of SSE frames for [PromptProxyRequest.stream] == true. */
+    fun streamPrepare(request: PromptProxyRequest): PromptProxyStreamPrepare =
+        when (val validated = validateRequest(request)) {
+            is PromptProxyValidateResult.Err ->
+                PromptProxyStreamPrepare.Validation(validated.detail)
+            is PromptProxyValidateResult.Ok ->
+                PromptProxyStreamPrepare.Frames(
+                    llm.streamChat(
+                        model = validated.routingModel,
+                        messages = validated.messages,
+                        temperature = DEFAULT_TEMPERATURE,
+                        maxTokens = DEFAULT_MAX_TOKENS,
+                    ),
+                )
+        }
+
+    private fun validateRequest(request: PromptProxyRequest): PromptProxyValidateResult {
         val styleTrim = request.style.trim()
         val promptTrim = request.prompt.trim()
         val languageTrim = request.language.trim()
@@ -17,21 +64,21 @@ class PromptProxyService(
                 ?: defaultRoutingModel.trim().takeIf { it.isNotEmpty() }
 
         if (promptTrim.isBlank()) {
-            return PromptProxyRunOutcome.Validation(
-                PromptProxyErrorDetail(message = "`prompt` must not be blank.")
+            return PromptProxyValidateResult.Err(
+                PromptProxyErrorDetail(message = "`prompt` must not be blank."),
             )
         }
         if (languageTrim.isBlank()) {
-            return PromptProxyRunOutcome.Validation(
-                PromptProxyErrorDetail(message = "`language` must not be blank.")
+            return PromptProxyValidateResult.Err(
+                PromptProxyErrorDetail(message = "`language` must not be blank."),
             )
         }
         if (routingModel.isNullOrBlank()) {
-            return PromptProxyRunOutcome.Validation(
+            return PromptProxyValidateResult.Err(
                 PromptProxyErrorDetail(
                     message =
                         "`model` must not be blank. Send a model id in the JSON body, " +
-                            "or set LLM_PROMPT_PROXY_MODEL or the provider default model on the server."
+                            "or set LLM_PROMPT_PROXY_MODEL or the provider default model on the server.",
                 ),
             )
         }
@@ -44,27 +91,7 @@ class PromptProxyService(
                 ChatMessage(role = "user", content = promptTrim),
             )
 
-        val outcome =
-            llm.completeChat(
-                model = routingModel,
-                messages = messages,
-                temperature = DEFAULT_TEMPERATURE,
-                maxTokens = DEFAULT_MAX_TOKENS,
-            )
-
-        return when (outcome) {
-            is LlmAttemptResult.Success -> PromptProxyRunOutcome.Ok(outcome.text)
-            is LlmAttemptResult.Failure ->
-                PromptProxyRunOutcome.Provider(
-                    PromptProxyErrorDetail(
-                        message = outcome.message,
-                        provider = outcome.provider,
-                        httpStatus = outcome.httpStatus,
-                        providerBody = outcome.providerBody,
-                        providerRaw = outcome.providerRaw,
-                    )
-                )
-        }
+        return PromptProxyValidateResult.Ok(routingModel = routingModel, messages = messages)
     }
 
     private companion object {
@@ -93,4 +120,16 @@ sealed interface PromptProxyRunOutcome {
     data class Validation(val detail: PromptProxyErrorDetail) : PromptProxyRunOutcome
 
     data class Provider(val detail: PromptProxyErrorDetail) : PromptProxyRunOutcome
+}
+
+private sealed interface PromptProxyValidateResult {
+    data class Err(val detail: PromptProxyErrorDetail) : PromptProxyValidateResult
+
+    data class Ok(val routingModel: String, val messages: List<ChatMessage>) : PromptProxyValidateResult
+}
+
+sealed interface PromptProxyStreamPrepare {
+    data class Validation(val detail: PromptProxyErrorDetail) : PromptProxyStreamPrepare
+
+    data class Frames(val flow: Flow<ProxyStreamFrame>) : PromptProxyStreamPrepare
 }

@@ -16,6 +16,8 @@ data class OpenRouterChatRequest(
     @SerialName("max_tokens")
     val maxTokens: Int,
     val temperature: Double,
+    /** OpenAI-compatible streaming; when true the response is `text/event-stream` (SSE lines). */
+    val stream: Boolean = false,
 )
 
 @Serializable

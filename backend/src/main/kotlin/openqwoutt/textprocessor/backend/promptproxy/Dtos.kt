@@ -16,6 +16,17 @@ data class PromptProxyRequest(
      * If null or blank, uses the server default (`LLM_PROMPT_PROXY_MODEL` / provider default).
      */
     val model: String? = null,
+    /**
+     * When true, the response is **SSE** (`text/event-stream`) instead of JSON.
+     * Omit or false keeps the original JSON response.
+     */
+    val stream: Boolean = false,
+)
+
+/** Payload for each `data:` line in the SSE response (incremental model text). */
+@Serializable
+data class PromptProxySseChunkDto(
+    val text: String,
 )
 
 @Serializable

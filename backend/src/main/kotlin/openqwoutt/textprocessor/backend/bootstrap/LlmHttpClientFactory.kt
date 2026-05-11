@@ -13,7 +13,13 @@ import kotlinx.serialization.json.Json
 
 /**
  * Shared outbound HTTP client for OpenRouter / NVIDIA (timeouts + JSON).
- * Env: `LLM_HTTP_REQUEST_TIMEOUT_MS` (default 120000), `LLM_HTTP_CONNECT_TIMEOUT_MS` (default 15000).
+ *
+ * Env:
+ * - `LLM_HTTP_REQUEST_TIMEOUT_MS` (default 120000) — non-streaming `chat/completions`.
+ * - `LLM_HTTP_CONNECT_TIMEOUT_MS` (default 15000).
+ *
+ * Streaming `chat/completions` (`stream: true`) uses a separate per-request timeout:
+ * `LLM_HTTP_STREAM_REQUEST_TIMEOUT_MS` (see prompt-proxy streaming completer).
  */
 fun createLlmHttpClient(
     json: Json,
