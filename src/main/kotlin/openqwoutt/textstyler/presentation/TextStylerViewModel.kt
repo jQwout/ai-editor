@@ -18,6 +18,9 @@ import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.data.prompts.PromptCategory
 import openqwoutt.miniapp.textstyler.data.prompts.PromptRepository
 import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
+import openqwoutt.miniapp.textstyler.ui.voiceinput.VoiceInputUiState
+import openqwoutt.miniapp.textstyler.ui.voiceinput.VoiceInputAction as VoiceAction
+import openqwoutt.miniapp.textstyler.ui.voiceinput.VoiceInputState as VoiceState
 import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.domain.TextStylerResult
 import openqwoutt.textstyler.data.settings.AppSettings
@@ -55,7 +58,10 @@ data class TextStylerState(
     val settings: AppSettings = AppSettings(),
     val closeBehavior: CloseBehavior = CloseBehavior.NavigateBack,
     val availableModels: List<String> = emptyList(),
-    val isLoadingModels: Boolean = false
+    val isLoadingModels: Boolean = false,
+    // Voice Input state
+    val showVoiceInput: Boolean = false,
+    val voiceInputPanelState: VoiceInputUiState = VoiceInputUiState()
 )
 
 enum class CloseBehavior {
@@ -86,6 +92,9 @@ sealed class TextStylerAction {
     data class SearchTemplates(val query: String) : TextStylerAction()
     data class SetCloseBehavior(val behavior: CloseBehavior) : TextStylerAction()
     data class SetOnResultReady(val callback: (String) -> Unit, val onClose: () -> Unit = {}) : TextStylerAction()
+    // Voice Input actions
+    data object ToggleVoiceInput : TextStylerAction()
+    data object InsertVoiceTranslation : TextStylerAction()
 }
 
 class TextStylerViewModel(
@@ -196,6 +205,20 @@ class TextStylerViewModel(
             is TextStylerAction.SetOnResultReady -> {
                 // We don't store callbacks in ViewModel anymore
                 // UI collects events from SharedFlow
+            }
+            is TextStylerAction.ToggleVoiceInput -> {
+                _state.update { it.copy(showVoiceInput = !it.showVoiceInput) }
+            }
+            is TextStylerAction.InsertVoiceTranslation -> {
+                val translation = _state.value.voiceInputPanelState.translatedText
+                if (translation.isNotBlank()) {
+                    _state.update {
+                        it.copy(
+                            inputText = it.inputText + translation,
+                            showVoiceInput = false
+                        )
+                    }
+                }
             }
         }
     }
