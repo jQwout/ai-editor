@@ -91,7 +91,6 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Google ML Kit for voice input and translation
-    implementation("com.google.mlkit:text-to-speech:17.0.0")
     implementation("com.google.mlkit:translate:17.0.2")
 
     // Coroutines for testing
