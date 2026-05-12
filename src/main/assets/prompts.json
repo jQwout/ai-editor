@@ -1,0 +1,310 @@
+{
+  "version": "1.0",
+  "description": "AI Prompt Templates Collection - Top 10 per category",
+  "categories": {
+    "music": {
+      "name": "Music Generation",
+      "description": "Prompts for Suno, Udio, MusicLM",
+      "items": [
+        {
+          "id": "pop_upbeat",
+          "name": "Upbeat Dance Pop",
+          "prompt": "Infectious pop anthem, female powerhouse vocals, pulsing 808 bass, synth-wave layers, euphoric build-ups, radio-ready polish, modern production, vocal harmonies on chorus",
+          "tags": ["pop", "dance", "upbeat", "summer"],
+          "bpm": "128",
+          "key": "C Major"
+        },
+        {
+          "id": "pop_ballad",
+          "name": "Emotional Pop Ballad",
+          "prompt": "Piano-driven ballad, raw emotional vocals, subtle string arrangements, builds from intimate verse to soaring chorus, modern radio production, reverb on vocals",
+          "tags": ["pop", "ballad", "emotional"],
+          "bpm": "72",
+          "key": "G Major"
+        },
+        {
+          "id": "indie_pop",
+          "name": "Indie Pop Vibe",
+          "prompt": "Jangly indie-pop, warm lo-fi aesthetic, vintage synths, organic drums, bedroom recording charm, catchy but not over-produced, tape saturation warmth",
+          "tags": ["indie", "lo-fi", "chill"],
+          "bpm": "115",
+          "key": "A Minor"
+        },
+        {
+          "id": "rock_stadium",
+          "name": "Stadium Rock Anthem",
+          "prompt": "Massive power chords, arena rock production, anthemic chorus, driving rhythm section, guitar solo, crowd-ready hooks, distorted guitars, thunderous drums",
+          "tags": ["rock", "stadium", "anthem"],
+          "bpm": "140",
+          "key": "E Minor"
+        },
+        {
+          "id": "grunge",
+          "name": "Grunge Revival",
+          "prompt": "Fuzzy distorted guitars, 90s grunge aesthetic, raw anguished vocals, dynamic quiet-loud structure, analog tape grit, genuine angst",
+          "tags": ["grunge", "alternative", "90s"],
+          "bpm": "95",
+          "key": "D Minor"
+        },
+        {
+          "id": "trap",
+          "name": "Modern Trap Banger",
+          "prompt": "Hard-hitting 808s, menacing trap beat, rapid hi-hat rolls, atmospheric pads, dark melodic undertones, confident rap flow, ad-libs",
+          "tags": ["hip-hop", "trap", "modern"],
+          "bpm": "75",
+          "key": "F Minor"
+        },
+        {
+          "id": "boom_bap",
+          "name": "Chill Boom Bap",
+          "prompt": "Classic boom bap drums, vinyl crackle, jazzy piano samples, laid-back smooth flow, storytelling rap, 90s hip-hop nostalgia",
+          "tags": ["hip-hop", "boom-bap", "classic"],
+          "bpm": "88",
+          "key": "E♭ Major"
+        },
+        {
+          "id": "country_pop",
+          "name": "Modern Country Pop",
+          "prompt": "Twangy steel guitar, modern pop production, catchy hooks, warm heartfelt vocals, banjo accents, uplifting chorus",
+          "tags": ["country", "modern"],
+          "bpm": "110",
+          "key": "G Major"
+        },
+        {
+          "id": "outlaw_country",
+          "name": "Outlaw Country Ballad",
+          "prompt": "Raw acoustic guitar, whiskey-soaked vocals, harmonica, honest storytelling, outlaw country grit, minimal production",
+          "tags": ["country", "outlaw", "acoustic"],
+          "bpm": "85",
+          "key": "A Major"
+        },
+        {
+          "id": "edm_festival",
+          "name": "Festival Main Stage Banger",
+          "prompt": "Massive synth drops, festival-ready energy, pulsing sub-bass, euphoric builds, sidechain compression, crowd-hyping elements, laser synths",
+          "tags": ["edm", "festival", "electronic"],
+          "bpm": "128",
+          "key": "C Minor"
+        }
+      ]
+    },
+    "video": {
+      "name": "Video Generation",
+      "description": "Prompts for Sora, Kling, Veo, Runway",
+      "items": [
+        {
+          "id": "cinematic_wide",
+          "name": "Cinematic Wide Shot",
+          "prompt": "Cinematic short film, wide establishing shot, slow dolly-in, subject walking in environment, golden hour lighting, sunset atmosphere",
+          "tags": ["cinematic", "wide", "establishing"],
+          "duration": "8s"
+        },
+        {
+          "id": "sora_multishot",
+          "name": "Sora Multi-Shot Template",
+          "prompt": "Scaffolded multi-shot template with scene headlines and beat timing. Shot 1 (0-5s): wide angle + action. Shot 2 (5-10s): medium close-up + action continuation. Physics notes: global rules.",
+          "tags": ["sora", "multi-shot", "template"],
+          "duration": "10s"
+        },
+        {
+          "id": "kling_timeline",
+          "name": "Kling Timeline Script",
+          "prompt": "Cinematic 16:9, visual style: modern. Beat 0-4s: camera angle + scene. Beat 4-8s: camera change + action. Beat 8-10s: final shot. Audio: ambient sound, SFX synchronized.",
+          "tags": ["kling", "timeline", "beats"],
+          "duration": "10s"
+        },
+        {
+          "id": "veo_structured",
+          "name": "Veo 3 Structured",
+          "prompt": "Project: Cinematic Commercial. Aspect ratio: 16:9. Camera: Alexa Mini LF. Lens: Anamorphic 35mm. Shot: Medium close-up. Movement: Slow dolly in. Lighting: Softbox 45° right.",
+          "tags": ["veo", "commercial", "professional"],
+          "duration": "8s"
+        },
+        {
+          "id": "sora_full_template",
+          "name": "Sora Full Template",
+          "prompt": "Plain language scene description with characters, costumes, scenery. Cinematography: camera shot + framing. Mood: overall tonal intent. Actions: beat-by-beat action with timing. Dialogue: character-specific lines.",
+          "tags": ["sora", "full", "template"],
+          "duration": "12s"
+        },
+        {
+          "id": "ultra_detailed",
+          "name": "Ultra-Detailed Production",
+          "prompt": "Format: emulated film stock, grain level, shutter angle. Lens: focal length + anamorphic ratio. Color grade with specific palette. Lighting: key source + bounce + negative fill. Shot breakdown with durations.",
+          "tags": ["professional", "film-look", "detailed"],
+          "duration": "12s"
+        },
+        {
+          "id": "hybrid_workflow",
+          "name": "Hybrid Workflow",
+          "prompt": "Step 1: Keyframe generation with Midjourney. Step 2: Motion synthesis with Veo. Step 3: Dialogue sync with Kling. Step 4: Upscaling to 4K.",
+          "tags": ["hybrid", "workflow", "professional"],
+          "duration": "varies"
+        },
+        {
+          "id": "music_video",
+          "name": "Audio-First Music Video",
+          "prompt": "Generate audio in Suno. Export beat timestamps. Map timeline beats to audio in Kling. Enable lip-sync mode with character reference.",
+          "tags": ["music-video", "audio-sync", "lip-sync"],
+          "duration": "music-length"
+        },
+        {
+          "id": "model_guide",
+          "name": "Model Selection Guide",
+          "prompt": "Runway: commercials, VFX, physics. Kling: music videos, dialogue. Veo: brand series, automation. Sora: physics simulation, fluid dynamics.",
+          "tags": ["guide", "model-selection"],
+          "duration": "varies"
+        },
+        {
+          "id": "common_fixes",
+          "name": "Common Fixes",
+          "prompt": "Problem solving: inconsistent style = use style reference. Quality degradation = regenerate from upscaled. Motion blur = crisp motion. Morphing = remains solid throughout.",
+          "tags": ["troubleshooting", "fixes"],
+          "duration": "varies"
+        }
+      ]
+    },
+    "image": {
+      "name": "Image Generation",
+      "description": "Prompts for Midjourney, DALL-E, Stable Diffusion",
+      "items": [
+        {
+          "id": "portrait_studio",
+          "name": "Studio Portrait",
+          "prompt": "Professional studio portrait, soft lighting, neutral background, detailed face, natural expression, Hasselblad medium format, f/2.8",
+          "tags": ["portrait", "studio", "professional"],
+          "model": "universal"
+        },
+        {
+          "id": "poster_movie",
+          "name": "Movie Poster Style",
+          "prompt": "Cinematic movie poster, dramatic lighting, bold typography space, retro aesthetic, 1980s film grain, anamorphic lens",
+          "tags": ["poster", "cinematic", "retro"],
+          "model": "midjourney"
+        },
+        {
+          "id": "ui_mockup",
+          "name": "UI Mockup",
+          "prompt": "Modern UI mockup, clean lines, iOS design language, floating cards, subtle shadows, Figma style, 2x resolution",
+          "tags": ["ui", "mockup", "modern"],
+          "model": "universal"
+        },
+        {
+          "id": "product_ad",
+          "name": "Product Advertisement",
+          "prompt": "Product photography, clean white background, professional lighting, hero shot,电商 style, studio quality",
+          "tags": ["product", "advertisement", "studio"],
+          "model": "universal"
+        },
+        {
+          "id": "character_sheet",
+          "name": "Character Sheet",
+          "prompt": "RPG character sheet, full body, front and side view, white background, detailed costume, fantasy style, DnD manual illustration",
+          "tags": ["character", "rpg", "fantasy"],
+          "model": "midjourney"
+        },
+        {
+          "id": "landscape_epic",
+          "name": "Epic Landscape",
+          "prompt": "Epic landscape photography, golden hour, dramatic clouds, mountain range, wide angle, 35mm, cinematic color grading",
+          "tags": ["landscape", "epic", "cinematic"],
+          "model": "universal"
+        },
+        {
+          "id": "food_photography",
+          "name": "Food Photography",
+          "prompt": "Professional food photography, natural light, top-down angle, clean composition, appetizing colors,美食摄影, editorial style",
+          "tags": ["food", "photography", "editorial"],
+          "model": "universal"
+        },
+        {
+          "id": "architectural",
+          "name": "Architectural Render",
+          "prompt": "Architectural visualization, modern minimal, rendered appearance, soft lighting, ArchiCAD style, interior/exterior",
+          "tags": ["architecture", "render", "modern"],
+          "model": "universal"
+        },
+        {
+          "id": "game_asset",
+          "name": "Game Asset",
+          "prompt": "Game asset, isometric view, consistent lighting, spritesheet ready, pixel art style, Unity compatible",
+          "tags": ["game", "asset", "2d"],
+          "model": "universal"
+        },
+        {
+          "id": "fashion_editorial",
+          "name": "Fashion Editorial",
+          "prompt": "Fashion editorial, high fashion, Vogue style, dramatic lighting, editorial composition, professional model, magazine quality",
+          "tags": ["fashion", "editorial", "magazine"],
+          "model": "universal"
+        }
+      ]
+    },
+    "text": {
+      "name": "Text Processing",
+      "description": "Prompts for text transformation",
+      "items": [
+        {
+          "id": "summarize",
+          "name": "Summarize",
+          "prompt": "Summarize the key points concisely:",
+          "tags": ["summary", "key-points"]
+        },
+        {
+          "id": "expand",
+          "name": "Expand",
+          "prompt": "Expand this with more detail and examples:",
+          "tags": ["expand", "detail"]
+        },
+        {
+          "id": "shorten",
+          "name": "Shorten",
+          "prompt": "Make this shorter while keeping the key meaning:",
+          "tags": ["shorten", "concise"]
+        },
+        {
+          "id": "simplify",
+          "name": "Simplify",
+          "prompt": "Simplify this text, use basic words:",
+          "tags": ["simplify", "easy"]
+        },
+        {
+          "id": "formal",
+          "name": "Formal",
+          "prompt": "Rewrite in formal professional style:",
+          "tags": ["formal", "professional"]
+        },
+        {
+          "id": "casual",
+          "name": "Casual",
+          "prompt": "Rewrite in casual conversational style:",
+          "tags": ["casual", "conversational"]
+        },
+        {
+          "id": "explain",
+          "name": "Explain",
+          "prompt": "Explain this in simple terms:",
+          "tags": ["explain", "understand"]
+        },
+        {
+          "id": "pros_cons",
+          "name": "Pros & Cons",
+          "prompt": "List the pros and cons:",
+          "tags": ["analysis", "decision"]
+        },
+        {
+          "id": "bullets",
+          "name": "Bullet Points",
+          "prompt": "Convert to bullet points:",
+          "tags": ["format", "list"]
+        },
+        {
+          "id": "steps",
+          "name": "Steps",
+          "prompt": "Convert to numbered steps:",
+          "tags": ["format", "instructions"]
+        }
+      ]
+    }
+  }
+}

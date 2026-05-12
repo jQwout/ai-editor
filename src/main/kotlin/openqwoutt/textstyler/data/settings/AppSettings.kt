@@ -1,0 +1,83 @@
+package openqwoutt.textstyler.data.settings
+
+import kotlinx.serialization.Serializable
+
+/**
+ * Supported AI providers for text processing.
+ */
+@Serializable
+enum class AiProvider(
+    val displayName: String,
+    val baseUrl: String,
+    val model: String,
+    val requiresApiKey: Boolean = false
+) {
+    OPEN_ROUTER(
+        displayName = "OpenRouter",
+        baseUrl = "https://openrouter.ai/api/v1",
+        model = "openai/gpt-4o-mini",
+        requiresApiKey = true
+    ),
+    NVIDIA(
+        displayName = "NVIDIA NIM",
+        baseUrl = "https://integrate.api.nvidia.com/v1",
+        model = "meta/llama-3.1-70b-instruct",
+        requiresApiKey = true
+    );
+
+    /**
+     * Heuristic: does this model id look like it belongs to this provider?
+     * Used as a sanity check before sending a request, to avoid e.g. shipping
+     * an OpenRouter model id to NVIDIA (which returns 401/403, not 404).
+     */
+    fun looksLikeOwnModel(modelId: String): Boolean {
+        if (modelId.isBlank()) return false
+        return when (this) {
+            NVIDIA -> modelId.startsWith("meta/") ||
+                modelId.startsWith("nvidia/") ||
+                modelId.startsWith("qwen/") ||
+                modelId.startsWith("mistralai/") ||
+                modelId.startsWith("google/") ||
+                modelId.startsWith("microsoft/") ||
+                modelId.startsWith("deepseek-ai/")
+            // OpenRouter is permissive: any non-empty id is acceptable.
+            OPEN_ROUTER -> true
+        }
+    }
+
+    companion object {
+        fun fromString(value: String): AiProvider {
+            return entries.find { it.name == value } ?: OPEN_ROUTER
+        }
+    }
+}
+
+@Serializable
+enum class AnimationType {
+    NONE,
+    TYPEWRITER,
+    FADE_IN
+}
+
+@Serializable
+data class AppSettings(
+    val backendUrl: String = "http://10.0.2.2:8080",
+    val defaultMode: String = "style",
+    val autoPaste: Boolean = true,
+    val autoCopyResult: Boolean = true,
+    val soundEffects: Boolean = false,
+    val hapticFeedback: Boolean = true,
+    val aiProvider: String = AiProvider.OPEN_ROUTER.name,
+    val aiModel: String = "",
+    val apiKey: String = "",
+    val saveHistory: Boolean = true,
+    val useBackend: Boolean = false,
+    val useStreaming: Boolean = true,
+    val animationType: AnimationType = AnimationType.TYPEWRITER
+) {
+    fun toAiProvider(): AiProvider = AiProvider.fromString(aiProvider)
+
+    fun effectiveModel(): String {
+        return aiModel.takeIf { it.isNotBlank() } ?: toAiProvider().model
+    }
+}
