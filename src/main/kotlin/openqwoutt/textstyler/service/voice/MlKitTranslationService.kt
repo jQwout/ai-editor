@@ -23,7 +23,10 @@ class MlKitTranslationService : TranslationService {
 
     override fun isAvailable(): Boolean = true
 
-    override fun areModelsDownloaded(): Boolean = currentTranslator?.downloadIfNeeded()?.isComplete == true
+    override fun areModelsDownloaded(): Boolean {
+        // ML Kit doesn't expose a synchronous way to check if models are already downloaded
+        return false
+    }
 
     override fun downloadModels(
         sourceLanguage: String,
@@ -37,11 +40,11 @@ class MlKitTranslationService : TranslationService {
             .requireWifi()
             .build()
 
-        translator.download(conditions)
+        translator.downloadModelIfNeeded(conditions)
             .addOnSuccessListener {
                 onComplete()
             }
-            .addOnFailureListener { e ->
+            .addOnFailureListener { e: Exception ->
                 onError("${TranslationError.DOWNLOAD_FAILED}: ${e.message}")
             }
     }
@@ -130,7 +133,7 @@ class MlKitTranslationService : TranslationService {
     private suspend fun downloadModelSync(translator: Translator) {
         suspendCancellableCoroutine { continuation ->
             val conditions = DownloadConditions.Builder().build()
-            translator.download(conditions)
+            translator.downloadModelIfNeeded(conditions)
                 .addOnSuccessListener {
                     if (continuation.isActive) {
                         continuation.resume(Unit)

@@ -81,10 +81,8 @@ class TextProcessorUseCase(
             ),
             apiKey = apiKey,
             temperature = mode.temperature
-        ).onStart { emit(StreamingResult.Started) }
-          .onEach { /* individual tokens emitted via map below */ }
-          .map { token -> StreamingResult.Token(token) as StreamingResult }
-          .onEach { /* handle completion below */ }
+        ).map { token -> StreamingResult.Token(token) }
+         .onStart { emit(StreamingResult.Token("...")) }
     }
 
     /**

@@ -19,7 +19,6 @@ import openqwoutt.miniapp.textstyler.data.prompts.PromptCategory
 import openqwoutt.miniapp.textstyler.data.prompts.PromptRepository
 import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
 import openqwoutt.miniapp.textstyler.domain.StyleMode
-import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.domain.TextStylerResult
 import openqwoutt.textstyler.data.settings.AppSettings
 import openqwoutt.textstyler.data.settings.OpenRouterModelsCache

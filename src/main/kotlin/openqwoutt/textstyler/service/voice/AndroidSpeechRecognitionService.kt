@@ -1,5 +1,6 @@
 package openqwoutt.miniapp.textstyler.service.voice
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -12,14 +13,14 @@ import java.util.Locale
 /**
  * Android implementation of SpeechRecognitionService using Android SpeechRecognizer API.
  */
-class AndroidSpeechRecognitionService : SpeechRecognitionService {
+class AndroidSpeechRecognitionService(private val context: Context) : SpeechRecognitionService {
 
     private var recognizer: SpeechRecognizer? = null
     private var isListening = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun isAvailable(): Boolean {
-        return SpeechRecognizer.isRecognitionAvailable(android.app.Application())
+        return SpeechRecognizer.isRecognitionAvailable(context)
     }
 
     override fun startListening(
@@ -34,7 +35,7 @@ class AndroidSpeechRecognitionService : SpeechRecognitionService {
 
         mainHandler.post {
             try {
-                recognizer = SpeechRecognizer(android.app.Application())
+                recognizer = SpeechRecognizer.createSpeechRecognizer(context)
                 recognizer?.setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
                         isListening = true
@@ -53,7 +54,7 @@ class AndroidSpeechRecognitionService : SpeechRecognitionService {
                     override fun onError(error: Int) {
                         isListening = false
                         val errorMessage = when (error) {
-                            SpeechRecognizer.ERROR_AUDIO_ERROR -> SpeechRecognitionError.UNKNOWN
+
                             SpeechRecognizer.ERROR_CLIENT -> SpeechRecognitionError.UNKNOWN
                             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> SpeechRecognitionError.PERMISSION_DENIED
                             SpeechRecognizer.ERROR_NETWORK -> SpeechRecognitionError.NETWORK_ERROR
