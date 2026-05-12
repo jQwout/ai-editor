@@ -14,10 +14,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
-import io.ktor.server.application.ApplicationStarted
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.call
 import io.ktor.server.application.install
+import io.ktor.server.application.log
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.calllogging.CallLogging
@@ -31,6 +31,9 @@ import io.ktor.server.routing.routing
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import openqwoutt.textprocessor.backend.promptstore.PromptStoreFeature
+import openqwoutt.textprocessor.backend.repoindex.PromptRegistryServiceKey
+import openqwoutt.textprocessor.backend.repoindex.RepoIndexFeature
 
 fun main() {
     val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
@@ -42,23 +45,33 @@ fun Application.module() {
         ignoreUnknownKeys = true
         explicitNulls = false
     }
-    val config = OpenRouterConfig.fromEnvironment()
-    val client = HttpClient(CIO) {
-        install(ClientContentNegotiation) {
-            json(json)
-        }
-        defaultRequest {
-            contentType(ContentType.Application.Json)
-            header(HttpHeaders.Authorization, "Bearer ${config.apiKey}")
-            config.httpReferer?.let { header("HTTP-Referer", it) }
-            header("X-Title", config.appTitle)
-        }
-    }
-    val openRouter = OpenRouterClient(client, config)
 
-    monitor.subscribe(ApplicationStopped) {
-        client.close()
-    }
+    // Optional: Postgres prompt registry + /repoindex/* (set REPO_INDEX_ENABLED=true)
+    RepoIndexFeature.install(this)
+
+    // Optional: prompt store admin API + Postgres (set PROMPT_STORE_ENABLED=true)
+    PromptStoreFeature.install(this, json)
+
+    val openRouter: OpenRouterClient? = runCatching {
+        val config = OpenRouterConfig.fromEnvironment()
+        val client = HttpClient(CIO) {
+            install(ClientContentNegotiation) {
+                json(json)
+            }
+            defaultRequest {
+                contentType(ContentType.Application.Json)
+                header(HttpHeaders.Authorization, "Bearer ${config.apiKey}")
+                config.httpReferer?.let { header("HTTP-Referer", it) }
+                header("X-Title", config.appTitle)
+            }
+        }
+        monitor.subscribe(ApplicationStopped) {
+            client.close()
+        }
+        OpenRouterClient(client, config)
+    }.onFailure {
+        log.warn("OpenRouter disabled: missing/invalid env (set OPENROUTER_API_KEY to enable).", it)
+    }.getOrNull()
 
     install(CallLogging)
     install(ContentNegotiation) {
@@ -67,6 +80,7 @@ fun Application.module() {
     install(CORS) {
         anyHost()
         allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.Authorization)
     }
 
     routing {
@@ -78,19 +92,72 @@ fun Application.module() {
             val request = call.receive<ProcessTextRequest>()
             val mode = StyleMode.fromId(request.mode)
             val text = request.text.trim()
+            val requestedModel = request.model?.trim()?.takeIf { it.isNotBlank() }
+            val returnPrompt = request.returnPrompt == true
+            val registry = attributes.getOrNull(PromptRegistryServiceKey)
 
             when {
+                openRouter == null -> call.respond(
+                    HttpStatusCode.ServiceUnavailable,
+                    ErrorResponse("OpenRouter is disabled on this server.")
+                )
                 text.isBlank() -> call.respond(HttpStatusCode.BadRequest, ErrorResponse("Text is required."))
                 mode == null -> call.respond(HttpStatusCode.BadRequest, ErrorResponse("Unknown mode."))
-                else -> runCatching {
-                    openRouter.processText(text = text.take(3000), mode = mode)
-                }.fold(
-                    onSuccess = { call.respond(ProcessTextResponse(result = it)) },
-                    onFailure = {
-                        call.application.environment.log.warn("OpenRouter request failed", it)
-                        call.respond(HttpStatusCode.BadGateway, ErrorResponse("AI backend failed."))
-                    }
+                requestedModel != null && registry == null -> call.respond(
+                    HttpStatusCode.ServiceUnavailable,
+                    ErrorResponse(
+                        "Prompt registry is disabled on this server. Omit \"model\" or set REPO_INDEX_ENABLED=true."
+                    )
                 )
+                else -> {
+                    val taskPrompt: String
+                    val temperature: Double
+                    val routingModel: String
+                    when {
+                        requestedModel != null -> {
+                            val eff = checkNotNull(registry).resolveEffectivePrompt(requestedModel, mode.id)
+                            if (eff == null) {
+                                call.respond(
+                                    HttpStatusCode.BadRequest,
+                                    ErrorResponse("Unknown/disabled model or missing prompt for this mode.")
+                                )
+                                return@post
+                            }
+                            taskPrompt = eff.promptText
+                            temperature = eff.temperature
+                            routingModel = requestedModel
+                        }
+                        else -> {
+                            taskPrompt = mode.prompt
+                            temperature = mode.temperature
+                            routingModel = openRouter.fallbackRoutingModel
+                        }
+                    }
+                    runCatching {
+                        openRouter.processText(
+                            text = text.take(3000),
+                            taskPrompt = taskPrompt,
+                            temperature = temperature,
+                            model = routingModel,
+                        )
+                    }.fold(
+                        onSuccess = {
+                            call.respond(
+                                ProcessTextResponse(
+                                    result = it,
+                                    model = if (returnPrompt) routingModel else null,
+                                    mode = if (returnPrompt) mode.id else null,
+                                    promptText = if (returnPrompt) taskPrompt else null,
+                                    temperature = if (returnPrompt) temperature else null,
+                                )
+                            )
+                        },
+                        onFailure = {
+                            call.application.environment.log.warn("OpenRouter request failed", it)
+                            call.respond(HttpStatusCode.BadGateway, ErrorResponse("AI backend failed."))
+                        }
+                    )
+                }
             }
         }
     }
@@ -118,22 +185,30 @@ private data class OpenRouterConfig(
 
 private class OpenRouterClient(
     private val httpClient: HttpClient,
-    private val config: OpenRouterConfig
+    private val config: OpenRouterConfig,
 ) {
-    suspend fun processText(text: String, mode: StyleMode): String {
+    /** Used when the client omits `model` in `/api/text/process` */
+    val fallbackRoutingModel: String get() = config.model
+
+    suspend fun processText(
+        text: String,
+        taskPrompt: String,
+        temperature: Double,
+        model: String,
+    ): String {
         val response = httpClient.post("https://openrouter.ai/api/v1/chat/completions") {
             setBody(
                 OpenRouterChatRequest(
-                    model = config.model,
+                    model = model,
                     messages = listOf(
                         ChatMessage(
                             role = "system",
-                            content = "${BASE_SYSTEM_PROMPT}\n\nTask: ${mode.prompt}"
+                            content = "${BASE_SYSTEM_PROMPT}\n\nTask: $taskPrompt"
                         ),
                         ChatMessage(role = "user", content = text)
                     ),
                     maxTokens = 900,
-                    temperature = mode.temperature
+                    temperature = temperature
                 )
             )
         }.body<OpenRouterChatResponse>()
@@ -155,12 +230,19 @@ Return only the final useful answer unless the selected task explicitly asks for
 @Serializable
 data class ProcessTextRequest(
     val text: String,
-    val mode: String
+    val mode: String,
+    val model: String? = null,
+    /** If true, include the resolved prompt + routing model in response. */
+    val returnPrompt: Boolean? = null,
 )
 
 @Serializable
 data class ProcessTextResponse(
-    val result: String
+    val result: String,
+    val model: String? = null,
+    val mode: String? = null,
+    val promptText: String? = null,
+    val temperature: Double? = null,
 )
 
 @Serializable

@@ -60,18 +60,18 @@ Implemented voice input feature with real-time translation using ML Kit for the 
 Since no remote repository is configured, follow these steps to create a PR:
 
 ```bash
-# 1. Add remote repository
-git remote add origin https://github.com/YOUR_USERNAME/side-ai-editor.git
-
-# 2. Push branch to remote
+# 1. Push branch to remote
+```bash
 git push -u origin feature/voice-translate
+```
 
-# 3. Create PR via GitHub CLI or GitHub web interface
-gh pr create --base master --head feature/voice-translate --title "feat(voice-input): add voice input with real-time translation"
+# 2. Create PR via GitHub CLI
+```bash
+gh pr create --repo jQwout/ai-editor --base master --head feature/voice-translate --title "feat(voice-input): add voice input with real-time translation"
 ```
 
 Or create PR manually at:
-`https://github.com/YOUR_USERNAME/side-ai-editor/compare/master...feature/voice-translate`
+`https://github.com/jQwout/ai-editor/compare/master...feature/voice-translate`
 
 ## Verification
 After PR is created, verify:
