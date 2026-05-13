@@ -1,8 +1,13 @@
 package openqwoutt.miniapp.textstyler.ui
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -91,6 +96,7 @@ import openqwoutt.miniapp.textstyler.domain.ModeGroup
 import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.presentation.TextStylerAction
 import openqwoutt.miniapp.textstyler.presentation.TextStylerState
+
 
 // Dark palette — purple accent
 private val Bg = Color(0xFF0F0F0F)
@@ -212,7 +218,6 @@ private fun MainContent(
         modifier = Modifier
             .fillMaxSize()
             .background(Bg)
-            .navigationBarsPadding()
             .imePadding()
     ) {
         // Top content: header + result area
@@ -280,29 +285,36 @@ private fun MainContent(
                 )
             }
 
+            val context = LocalContext.current
+            val micPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { isGranted ->
+                if (isGranted) {
+                    onAction(TextStylerAction.StartVoiceRecording)
+                } else {
+                    onAction(TextStylerAction.VoiceError("Microphone permission denied"))
+                }
+            }
+
             InputCard(
                 state = state,
                 onAction = onAction,
-                clipboard = clipboard
+                clipboard = clipboard,
+                onToggleVoice = {
+                    if (state.isVoiceRecording) {
+                        onAction(TextStylerAction.StopVoiceRecording)
+                    } else {
+                        when (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)) {
+                            PackageManager.PERMISSION_GRANTED -> {
+                                onAction(TextStylerAction.StartVoiceRecording)
+                            }
+                            else -> {
+                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        }
+                    }
+                }
             )
-
-            // Voice Input Panel
-            AnimatedVisibility(
-                visible = state.showVoiceInput,
-                enter = expandVertically(
-                    animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
-                ) + fadeIn(tween(ANIMATION_DURATION)),
-                exit = shrinkVertically(
-                    animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
-                ) + fadeOut(tween(ANIMATION_DURATION))
-            ) {
-                VoiceInputPanel(
-                    state = state.voiceInputPanelState,
-                    onAction = onAction,
-                    onInsertTranslation = { onAction(TextStylerAction.InsertVoiceTranslation) },
-                    modifier = Modifier.padding(top = 12.dp)
-                )
-            }
         }
     }
 }
@@ -509,7 +521,8 @@ private fun StyleSubModesStrip(
 private fun InputCard(
     state: TextStylerState,
     onAction: (TextStylerAction) -> Unit,
-    clipboard: ClipboardManager
+    clipboard: ClipboardManager,
+    onToggleVoice: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -545,6 +558,33 @@ private fun InputCard(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Voice recording hint
+        AnimatedVisibility(
+            visible = state.isVoiceRecording,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(Color(0xFFFF3B30), CircleShape)
+                )
+                Text(
+                    text = "Говорите...",
+                    color = Accent,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
         // Text input
         BasicTextField(
             value = state.inputText,
@@ -564,7 +604,7 @@ private fun InputCard(
             ),
             decorationBox = { innerTextField ->
                 Box {
-                    if (state.inputText.isEmpty()) {
+                    if (state.inputText.isEmpty() && !state.isVoiceRecording) {
                         Text(
                             text = "Type or paste text...",
                             color = TextSecondary.copy(alpha = 0.6f),
@@ -649,22 +689,28 @@ private fun InputCard(
                     )
                 }
 
-                // Voice Input button
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (state.showVoiceInput) AccentSoft else CardBg)
-                        .border(1.dp, if (state.showVoiceInput) Accent else Divider, RoundedCornerShape(10.dp))
-                        .clickable { onAction(TextStylerAction.ToggleVoiceInput) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = "Voice Input",
-                        tint = if (state.showVoiceInput) Accent else TextSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                // Voice Input button — only visible when text is empty or recording
+                if (state.inputText.isEmpty() || state.isVoiceRecording) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (state.isVoiceRecording) Color(0xFFFF3B30).copy(alpha = 0.15f) else CardBg)
+                            .border(
+                                1.dp,
+                                if (state.isVoiceRecording) Color(0xFFFF3B30) else Divider,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { onToggleVoice() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = if (state.isVoiceRecording) "Stop recording" else "Voice Input",
+                            tint = if (state.isVoiceRecording) Color(0xFFFF3B30) else TextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 

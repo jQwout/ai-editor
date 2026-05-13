@@ -18,9 +18,8 @@ import openqwoutt.miniapp.textstyler.domain.TextProcessorUseCase
 import openqwoutt.miniapp.textstyler.data.prompts.PromptCategory
 import openqwoutt.miniapp.textstyler.data.prompts.PromptRepository
 import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
-import openqwoutt.miniapp.textstyler.ui.voiceinput.VoiceInputUiState
-import openqwoutt.miniapp.textstyler.ui.voiceinput.VoiceInputAction as VoiceAction
-import openqwoutt.miniapp.textstyler.ui.voiceinput.VoiceInputState as VoiceState
+import openqwoutt.miniapp.textstyler.service.voice.SpeechRecognitionResult
+import openqwoutt.miniapp.textstyler.service.voice.SpeechRecognitionService
 import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.domain.TextStylerResult
 import openqwoutt.textstyler.data.settings.AppSettings
@@ -59,9 +58,8 @@ data class TextStylerState(
     val closeBehavior: CloseBehavior = CloseBehavior.NavigateBack,
     val availableModels: List<String> = emptyList(),
     val isLoadingModels: Boolean = false,
-    // Voice Input state
-    val showVoiceInput: Boolean = false,
-    val voiceInputPanelState: VoiceInputUiState = VoiceInputUiState()
+    // Voice recording state
+    val isVoiceRecording: Boolean = false
 )
 
 enum class CloseBehavior {
@@ -92,16 +90,19 @@ sealed class TextStylerAction {
     data class SearchTemplates(val query: String) : TextStylerAction()
     data class SetCloseBehavior(val behavior: CloseBehavior) : TextStylerAction()
     data class SetOnResultReady(val callback: (String) -> Unit, val onClose: () -> Unit = {}) : TextStylerAction()
-    // Voice Input actions
-    data object ToggleVoiceInput : TextStylerAction()
-    data object InsertVoiceTranslation : TextStylerAction()
+    // Voice recording actions
+    data object StartVoiceRecording : TextStylerAction()
+    data object StopVoiceRecording : TextStylerAction()
+    data class VoiceResult(val text: String) : TextStylerAction()
+    data class VoiceError(val message: String) : TextStylerAction()
 }
 
 class TextStylerViewModel(
     private val textProcessorUseCase: TextProcessorUseCase,
     private val settingsRepository: SettingsRepository,
     private val promptRepository: PromptRepository,
-    private val interactionRepository: InteractionRepository
+    private val interactionRepository: InteractionRepository,
+    private val speechService: SpeechRecognitionService
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TextStylerState())
@@ -206,18 +207,51 @@ class TextStylerViewModel(
                 // We don't store callbacks in ViewModel anymore
                 // UI collects events from SharedFlow
             }
-            is TextStylerAction.ToggleVoiceInput -> {
-                _state.update { it.copy(showVoiceInput = !it.showVoiceInput) }
-            }
-            is TextStylerAction.InsertVoiceTranslation -> {
-                val translation = _state.value.voiceInputPanelState.translatedText
-                if (translation.isNotBlank()) {
-                    _state.update {
-                        it.copy(
-                            inputText = it.inputText + translation,
-                            showVoiceInput = false
-                        )
+            is TextStylerAction.StartVoiceRecording -> {
+                if (!speechService.isAvailable()) {
+                    _state.update { it.copy(error = "Speech recognition is not available on this device") }
+                    return
+                }
+                _state.update { it.copy(isVoiceRecording = true, error = null) }
+                speechService.startListening(
+                    languageCode = java.util.Locale.getDefault().toLanguageTag(),
+                    onResult = { result ->
+                        when (result) {
+                            is SpeechRecognitionResult.Final -> {
+                                handle(TextStylerAction.VoiceResult(result.text))
+                            }
+                            is SpeechRecognitionResult.Partial -> {
+                                // Optionally show partial result in real-time
+                            }
+                            is SpeechRecognitionResult.Interim -> {}
+                        }
+                    },
+                    onError = { error ->
+                        handle(TextStylerAction.VoiceError(error))
+                    },
+                    onEnd = {
+                        _state.update { it.copy(isVoiceRecording = false) }
                     }
+                )
+            }
+            is TextStylerAction.StopVoiceRecording -> {
+                speechService.stopListening()
+                _state.update { it.copy(isVoiceRecording = false) }
+            }
+            is TextStylerAction.VoiceResult -> {
+                _state.update {
+                    it.copy(
+                        inputText = it.inputText + action.text,
+                        isVoiceRecording = false
+                    )
+                }
+            }
+            is TextStylerAction.VoiceError -> {
+                _state.update {
+                    it.copy(
+                        error = action.message,
+                        isVoiceRecording = false
+                    )
                 }
             }
         }
@@ -383,5 +417,10 @@ class TextStylerViewModel(
                 // Do nothing extra, just show result
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        speechService.release()
     }
 }

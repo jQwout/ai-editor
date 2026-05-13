@@ -21,6 +21,8 @@ import openqwoutt.textstyler.data.settings.OpenRouterModelsRepository
 import openqwoutt.textstyler.data.settings.SecureStorage
 import openqwoutt.textstyler.data.settings.SettingsRepository
 import openqwoutt.textstyler.network.AiApiClient
+import openqwoutt.miniapp.textstyler.service.voice.AndroidSpeechRecognitionService
+import openqwoutt.miniapp.textstyler.service.voice.SpeechRecognitionService
 
 /**
  * Application-scoped Metro dependency graph.
@@ -103,12 +105,18 @@ interface AppGraph {
 
     @Provides
     @SingleIn(AppScope::class)
+    fun provideSpeechRecognitionService(context: Context): SpeechRecognitionService =
+        AndroidSpeechRecognitionService(context)
+
+    @Provides
+    @SingleIn(AppScope::class)
     @Named("textStyler")
     fun provideTextStylerViewModelFactory(
         textProcessorUseCase: TextProcessorUseCase,
         settingsRepository: SettingsRepository,
         promptRepository: PromptRepository,
-        interactionRepository: InteractionRepository
+        interactionRepository: InteractionRepository,
+        speechRecognitionService: SpeechRecognitionService
     ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
@@ -116,7 +124,8 @@ interface AppGraph {
                 textProcessorUseCase = textProcessorUseCase,
                 settingsRepository = settingsRepository,
                 promptRepository = promptRepository,
-                interactionRepository = interactionRepository
+                interactionRepository = interactionRepository,
+                speechService = speechRecognitionService
             ) as T
         }
     }
