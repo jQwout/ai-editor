@@ -43,6 +43,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -161,6 +164,7 @@ sealed class SettingsMenuItem {
 // ============================================================================
 // Composable Entry Point
 // ============================================================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
@@ -182,7 +186,7 @@ fun SettingsScreen(
             SettingsState(
                 aiModel = settings.effectiveModel(),
                 apiKey = settings.apiKey,
-                themeMode = ThemeMode.LIGHT // TODO: parse from settings
+                themeMode = ThemeMode.LIGHT
             )
         )
     }
@@ -198,6 +202,18 @@ fun SettingsScreen(
                 state = state.copy(aiModel = model, apiKey = key)
             },
             onBack = { showAiModelScreen = false },
+            isDarkTheme = isDarkTheme
+        )
+    }
+    
+    if (showLanguageScreen) {
+        LanguageBottomSheet(
+            currentLanguage = state.language,
+            onLanguageSelected = { language ->
+                state = state.copy(language = language)
+                showLanguageScreen = false
+            },
+            onDismiss = { showLanguageScreen = false },
             isDarkTheme = isDarkTheme
         )
     } else {
@@ -953,3 +969,151 @@ fun AiModelSelectionScreen(
         }
     }
 }
+
+// ============================================================================
+// Language Bottom Sheet
+// ============================================================================
+@Composable
+private fun LanguageBottomSheet(
+    currentLanguage: String,
+    onLanguageSelected: (String) -> Unit,
+    onDismiss: () -> Unit,
+    isDarkTheme: Boolean
+) {
+    val appBg = if (isDarkTheme) DarkAppBg else LightAppBg
+    val cardBg = if (isDarkTheme) DarkCardBg else LightCardBg
+    val primary = if (isDarkTheme) DarkPrimary else LightPrimary
+    val textPrimary = if (isDarkTheme) DarkTextPrimary else LightTextPrimary
+    val textSecondary = if (isDarkTheme) DarkTextSecondary else LightTextSecondary
+    val iconBg = if (isDarkTheme) DarkIconBg else LightIconBg
+    val activeBadge = if (isDarkTheme) DarkActiveBadge else LightActiveBadge
+    val cardBorder = if (isDarkTheme) DarkCardBorder else LightCardBorder
+    
+    val languages = listOf(
+        LanguageOption("English", "US"),
+        LanguageOption("Russian", "RU")
+    )
+    
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = cardBg,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = textSecondary) }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Select Language",
+                color = textPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            
+            languages.forEach { lang ->
+                LanguageOptionCard(
+                    language = lang,
+                    isSelected = currentLanguage == lang.name,
+                    primary = primary,
+                    cardBg = cardBg,
+                    cardBorder = cardBorder,
+                    textPrimary = textPrimary,
+                    textSecondary = textSecondary,
+                    activeBadge = activeBadge,
+                    onClick = { onLanguageSelected(lang.name) }
+                )
+            }
+        }
+    }
+}
+
+data class LanguageOption(
+    val name: String,
+    val code: String
+)
+
+@Composable
+private fun LanguageOptionCard(
+    language: LanguageOption,
+    isSelected: Boolean,
+    primary: Color,
+    cardBg: Color,
+    cardBorder: Color,
+    textPrimary: Color,
+    textSecondary: Color,
+    activeBadge: Color,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) activeBadge else cardBg)
+            .border(1.dp, if (isSelected) primary else cardBorder, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Language code badge
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isSelected) primary else LightIconBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = language.code,
+                        color = if (isSelected) Color.White else textSecondary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Text(
+                    text = language.name,
+                    color = textPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            
+            // Selection indicator
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) primary else Color.Transparent)
+                    .border(
+                        width = if (isSelected) 0.dp else 1.5.dp,
+                        color = if (isSelected) primary else textSecondary,
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val LightIconBg = Color(0xFFF3F4F6)
