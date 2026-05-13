@@ -142,7 +142,6 @@ class TextProcessorUseCase(
         return cleaned.take(maxChars)
     }
 
-
     private suspend fun sendToBackend(text: String, mode: StyleMode, configuredBackendUrl: String): String = withContext(Dispatchers.IO) {
         val effectiveBackendUrl = configuredBackendUrl.takeIf { it.isNotBlank() } ?: backendUrl
         val response = apiClient.processText(effectiveBackendUrl, text, mode.id)

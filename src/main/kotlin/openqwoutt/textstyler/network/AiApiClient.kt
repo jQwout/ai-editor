@@ -22,6 +22,8 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emit
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -152,7 +154,8 @@ class AiApiClient {
             messages = messages,
             maxTokens = maxTokens,
             temperature = temperature,
-            topP = topP
+            topP = topP,
+            stream = false
         )
 
         val response = client.post("${provider.baseUrl}/chat/completions") {
