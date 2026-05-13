@@ -261,6 +261,7 @@ fun SettingsScreen(
                                 settings.copy(
                                     aiModel = state.aiModel,
                                     apiKey = state.apiKey,
+                                    language = state.language,
                                     useBackend = state.customBackendEnabled,
                                     backendUrl = state.customBackendUrl
                                 )
