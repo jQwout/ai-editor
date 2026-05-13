@@ -86,6 +86,10 @@ interface AppGraph {
 
     @Provides
     @SingleIn(AppScope::class)
+    fun providePromptRepository(context: Context): PromptRepository = PromptRepository(context)
+
+    @Provides
+    @SingleIn(AppScope::class)
     fun provideTextProcessorUseCase(
         settingsRepository: SettingsRepository,
         aiApiClient: AiApiClient

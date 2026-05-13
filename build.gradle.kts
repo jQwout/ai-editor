@@ -35,6 +35,7 @@ android {
     }
 
     compileOptions {
+        // JVM 21 is required: Android Gradle Plugin 8.13+ defaults to Java 21
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
