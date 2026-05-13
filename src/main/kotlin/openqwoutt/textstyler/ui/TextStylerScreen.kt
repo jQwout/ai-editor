@@ -69,6 +69,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,12 +86,17 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import openqwoutt.miniapp.textstyler.data.prompts.PromptCategory
 import openqwoutt.miniapp.textstyler.data.prompts.PromptTemplate
 import openqwoutt.miniapp.textstyler.domain.ModeGroup
 import openqwoutt.miniapp.textstyler.domain.StyleMode
 import openqwoutt.miniapp.textstyler.presentation.TextStylerAction
 import openqwoutt.miniapp.textstyler.presentation.TextStylerState
+import openqwoutt.miniapp.textstyler.ui.navigation.NavRoutes
 
 // Dark palette — purple accent
 private val Bg = Color(0xFF0F0F0F)
@@ -115,18 +121,66 @@ fun TextStylerScreen(
 ) {
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val navController = rememberNavController()
 
-    Crossfade(
-        targetState = state.showSettings,
-        animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing),
-        label = "settings_crossfade",
-        modifier = modifier
-    ) { showSettings ->
-        if (showSettings) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f))
+    // Handle back stack: when empty, call onNavigateBack()
+    LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect { entry ->
+            // When we're on main route and user presses back, call onNavigateBack
+            if (entry.destination.route == NavRoutes.Main.route && entry.lifecycle.currentState == androidx.lifecycle.Lifecycle.State.DESTROYED) {
+                if (navController.backQueue.size <= 1) {
+                    onNavigateBack()
+                }
+            }
+        }
+    }
+
+    // Sync NavHost routes with state flags
+    LaunchedEffect(state.showHistory, state.showSettings) {
+        val currentRoute = navController.currentDestination?.route
+        when {
+            state.showHistory && currentRoute != NavRoutes.History.route -> {
+                navController.navigate(NavRoutes.History.route)
+            }
+            state.showSettings && currentRoute != NavRoutes.Settings.route -> {
+                navController.navigate(NavRoutes.Settings.route)
+            }
+            !state.showHistory && !state.showSettings && currentRoute != NavRoutes.Main.route -> {
+                navController.popBackStack(NavRoutes.Main.route, inclusive = false)
+            }
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = NavRoutes.Main.route
+        ) {
+            composable(
+                route = NavRoutes.Main.route,
+                enterTransition = { fadeIn(tween(300)) },
+                exitTransition = { fadeOut(tween(300)) }
+            ) {
+                MainContent(
+                    state = state,
+                    onAction = onAction,
+                    onNavigateBack = onNavigateBack,
+                    clipboard = clipboard
+                )
+            }
+            composable(
+                route = NavRoutes.History.route,
+                enterTransition = { fadeIn(tween(300)) },
+                exitTransition = { fadeOut(tween(300)) }
+            ) {
+                HistoryScreen(
+                    onBack = { onAction(TextStylerAction.HideHistory) }
+                )
+            }
+            composable(
+                route = NavRoutes.Settings.route,
+                enterTransition = { fadeIn(tween(300)) },
+                exitTransition = { fadeOut(tween(300)) }
             ) {
                 SettingsScreen(
                     settings = state.settings,
@@ -136,66 +190,40 @@ fun TextStylerScreen(
                     onBack = { onAction(TextStylerAction.ToggleSettings) }
                 )
             }
-        } else {
-            Crossfade(
-                targetState = state.showTemplates,
-                animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing),
-                label = "templates_crossfade"
-            ) { showTemplates ->
-                if (showTemplates) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f))
-                    ) {
-                        TemplatesSheet(
-                            templates = state.availableTemplates,
-                            categories = state.availableCategories,
-                            selectedCategory = state.selectedCategory,
-                            selectedTemplate = state.selectedTemplate,
-                            onSelect = { template ->
-                                onAction(TextStylerAction.SelectTemplate(template))
-                                onAction(TextStylerAction.HideTemplates)
-                            },
-                            onSelectCategory = { category ->
-                                onAction(TextStylerAction.SelectCategory(category))
-                            },
-                            onSearch = { query ->
-                                onAction(TextStylerAction.SearchTemplates(query))
-                            },
-                            onClear = {
-                                onAction(TextStylerAction.SelectTemplate(null))
-                                onAction(TextStylerAction.HideTemplates)
-                            },
-                            onBack = { onAction(TextStylerAction.HideTemplates) }
-                        )
-                    }
-                } else {
-                    Crossfade(
-                        targetState = state.showHistory,
-                        animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing),
-                        label = "history_crossfade"
-                    ) { showHistory ->
-                        if (showHistory) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.5f))
-                            ) {
-                                HistoryScreen(
-                                    onBack = { onAction(TextStylerAction.HideHistory) }
-                                )
-                            }
-                        } else {
-                            MainContent(
-                                state = state,
-                                onAction = onAction,
-                                onNavigateBack = onNavigateBack,
-                                clipboard = clipboard
-                            )
-                        }
-                    }
-                }
+        }
+
+        // TemplatesSheet as overlay (not in NavHost)
+        AnimatedVisibility(
+            visible = state.showTemplates,
+            enter = slideInVertically(initialValueY = { it }) + fadeIn(tween(300)),
+            exit = slideOutVertically(targetValueY = { it }) + fadeOut(tween(300))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+            ) {
+                TemplatesSheet(
+                    templates = state.availableTemplates,
+                    categories = state.availableCategories,
+                    selectedCategory = state.selectedCategory,
+                    selectedTemplate = state.selectedTemplate,
+                    onSelect = { template ->
+                        onAction(TextStylerAction.SelectTemplate(template))
+                        onAction(TextStylerAction.HideTemplates)
+                    },
+                    onSelectCategory = { category ->
+                        onAction(TextStylerAction.SelectCategory(category))
+                    },
+                    onSearch = { query ->
+                        onAction(TextStylerAction.SearchTemplates(query))
+                    },
+                    onClear = {
+                        onAction(TextStylerAction.SelectTemplate(null))
+                        onAction(TextStylerAction.HideTemplates)
+                    },
+                    onBack = { onAction(TextStylerAction.HideTemplates) }
+                )
             }
         }
     }
