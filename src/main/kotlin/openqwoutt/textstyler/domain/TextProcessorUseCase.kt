@@ -81,10 +81,8 @@ class TextProcessorUseCase(
             ),
             apiKey = apiKey,
             temperature = mode.temperature
-        ).onStart { emit(StreamingResult.Started) }
-          .onEach { /* individual tokens emitted via map below */ }
-          .map { token -> StreamingResult.Token(token) as StreamingResult }
-          .onEach { /* handle completion below */ }
+        ).map { token -> StreamingResult.Token(token) }
+         .onStart { emit(StreamingResult.Token("...")) }
     }
 
     /**
@@ -141,6 +139,7 @@ class TextProcessorUseCase(
 
         return cleaned.take(maxChars)
     }
+
 
     private suspend fun sendToBackend(text: String, mode: StyleMode, configuredBackendUrl: String): String = withContext(Dispatchers.IO) {
         val effectiveBackendUrl = configuredBackendUrl.takeIf { it.isNotBlank() } ?: backendUrl

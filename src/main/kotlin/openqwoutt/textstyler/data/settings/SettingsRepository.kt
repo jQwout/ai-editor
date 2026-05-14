@@ -28,7 +28,9 @@ class SettingsRepository(
                 ?: defaults.aiProvider,
             aiModel = prefs.getString(KEY_AI_MODEL, defaults.aiModel)
                 ?: defaults.aiModel,
-            apiKey = apiKey
+            apiKey = apiKey,
+            language = prefs.getString(KEY_LANGUAGE, defaults.language)
+                ?: defaults.language
         )
 
         return app
@@ -47,6 +49,7 @@ class SettingsRepository(
             putString(KEY_AI_PROVIDER, settings.aiProvider)
             putString(KEY_AI_MODEL, settings.aiModel)
             putString(KEY_API_KEY, settings.apiKey)
+            putString(KEY_LANGUAGE, settings.language)
             apply()
         }
     }
@@ -65,5 +68,6 @@ class SettingsRepository(
         private const val KEY_API_KEY = "api_key"
         private const val KEY_AI_PROVIDER = "ai_provider"
         private const val KEY_AI_MODEL = "ai_model"
+        private const val KEY_LANGUAGE = "language"
     }
 }
