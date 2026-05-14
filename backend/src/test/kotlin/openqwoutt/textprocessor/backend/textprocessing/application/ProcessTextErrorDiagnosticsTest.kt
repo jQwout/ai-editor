@@ -1,6 +1,7 @@
 package openqwoutt.textprocessor.backend.textprocessing.application
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -24,5 +25,20 @@ class ProcessTextErrorDiagnosticsTest {
     @Test
     fun `truncate null stays null`() {
         assertEquals(null, ProcessTextErrorDiagnostics.truncateProviderRaw(null))
+    }
+
+    @Test
+    fun `truncate with flag false when short`() {
+        val (s, t) = ProcessTextErrorDiagnostics.truncateProviderRawWithFlag("ok")
+        assertEquals("ok", s)
+        assertFalse(t)
+    }
+
+    @Test
+    fun `truncate with flag true when over limit`() {
+        val raw = "b".repeat(ProcessTextErrorDiagnostics.MAX_PROVIDER_RAW_CHARS + 40)
+        val (s, t) = ProcessTextErrorDiagnostics.truncateProviderRawWithFlag(raw)
+        assertTrue(t)
+        assertTrue((s ?: "").length < raw.length)
     }
 }

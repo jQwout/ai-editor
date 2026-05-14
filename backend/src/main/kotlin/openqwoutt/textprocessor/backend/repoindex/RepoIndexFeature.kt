@@ -3,6 +3,7 @@ package openqwoutt.textprocessor.backend.repoindex
 import com.zaxxer.hikari.HikariDataSource
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
@@ -45,6 +46,17 @@ object RepoIndexFeature {
         val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
         val http = HttpClient(CIO) {
             install(ClientContentNegotiation) { json(json) }
+            install(HttpTimeout) {
+                val requestMs =
+                    System.getenv("REPO_INDEX_HTTP_REQUEST_TIMEOUT_MS")?.toLongOrNull()?.coerceAtLeast(5_000L)
+                        ?: 120_000L
+                val connectMs =
+                    System.getenv("REPO_INDEX_HTTP_CONNECT_TIMEOUT_MS")?.toLongOrNull()?.coerceAtLeast(1_000L)
+                        ?: 15_000L
+                requestTimeoutMillis = requestMs
+                connectTimeoutMillis = connectMs
+                socketTimeoutMillis = requestMs
+            }
         }
         val ingestor = PublicRepoIngestor(http = http, cfg = cfg, publicPromptService = publicPromptService)
         app.attributes.put(PublicRepoIngestorKey, ingestor)

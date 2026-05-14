@@ -48,6 +48,8 @@ dependencies {
     implementation("io.ktor:ktor-server-cors:$ktorVersion")
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("ch.qos.logback:logback-classic:1.5.13")
+    implementation("io.micrometer:micrometer-core:1.14.5")
+    implementation("io.micrometer:micrometer-registry-prometheus:1.14.5")
 
     // Repo indexer (feature-flagged): Postgres + migrations
     implementation("org.postgresql:postgresql:42.7.6")

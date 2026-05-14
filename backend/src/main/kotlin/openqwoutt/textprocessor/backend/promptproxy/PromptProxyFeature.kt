@@ -1,6 +1,7 @@
 package openqwoutt.textprocessor.backend.promptproxy
 
 import io.ktor.client.HttpClient
+import io.micrometer.core.instrument.MeterRegistry
 import io.ktor.server.application.Application
 import io.ktor.server.application.log
 import io.ktor.server.routing.routing
@@ -18,10 +19,20 @@ object PromptProxyFeature {
         chatCompletionsUrl: String?,
         providerId: String?,
         routingModel: String?,
+        promptProxyApiKey: String?,
+        meterRegistry: MeterRegistry? = null,
     ) {
         if (llmHttpClient == null || chatCompletionsUrl.isNullOrBlank() || providerId.isNullOrBlank()) {
             application.log.info(
                 "Prompt proxy disabled (LLM HTTP client unavailable, chat URL missing, or provider unset)."
+            )
+            return
+        }
+
+        val apiKey = promptProxyApiKey?.trim().orEmpty()
+        if (apiKey.isEmpty()) {
+            application.log.warn(
+                "Prompt proxy disabled: set PROMPT_PROXY_API_KEY when LLM is enabled (required for /api/prompt/proxy)."
             )
             return
         }
@@ -32,12 +43,13 @@ object PromptProxyFeature {
                 json = json,
                 chatCompletionsUrl = chatCompletionsUrl.trim(),
                 providerId = providerId.trim(),
+                meterRegistry = meterRegistry,
             )
         val defaultRoutingModel = routingModel?.trim().orEmpty()
         val service = PromptProxyService(llm = completer, defaultRoutingModel = defaultRoutingModel)
 
         application.routing {
-            promptProxyRoutes(service)
+            promptProxyRoutes(service, apiKey)
         }
     }
 }

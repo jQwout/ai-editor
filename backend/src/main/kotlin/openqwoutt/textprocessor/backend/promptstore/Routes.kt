@@ -9,6 +9,8 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import kotlinx.serialization.json.JsonObject
+import openqwoutt.textprocessor.backend.limits.ADMIN_UPSERT_MAX_ITEMS
+import openqwoutt.textprocessor.backend.security.secureEqualsUtf8Strings
 
 fun Route.promptStoreRoutes(service: PromptStoreService, cfg: PromptStoreConfig) {
     post("/admin/prompt") {
@@ -27,6 +29,17 @@ fun Route.promptStoreRoutes(service: PromptStoreService, cfg: PromptStoreConfig)
     post("/admin/prompts") {
         if (!call.requirePromptAdmin(cfg)) return@post
         val body = call.receive<AdminUpsertPromptsRequest>()
+        if (body.prompts.size > ADMIN_UPSERT_MAX_ITEMS) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf(
+                    "error" to
+                        "Batch exceeds maximum size ($ADMIN_UPSERT_MAX_ITEMS). " +
+                            "Split the import into smaller requests.",
+                ),
+            )
+            return@post
+        }
         val validated =
             buildList(capacity = body.prompts.size) {
                 for (p in body.prompts) {
@@ -48,7 +61,7 @@ private suspend fun ApplicationCall.requirePromptAdmin(cfg: PromptStoreConfig): 
     }
     val header = request.headers[HttpHeaders.Authorization].orEmpty()
     val token = header.removePrefix("Bearer ").trim()
-    if (token != expected) {
+    if (!secureEqualsUtf8Strings(token, expected)) {
         respond(HttpStatusCode.Unauthorized, mapOf("error" to "Unauthorized"))
         return false
     }

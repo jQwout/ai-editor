@@ -3,8 +3,10 @@ package openqwoutt.textprocessor.backend.promptproxy
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.call.body
 import io.ktor.client.request.post
+import io.ktor.client.request.header
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -30,6 +32,10 @@ import org.junit.jupiter.api.Test
 class PromptProxyRoutesTest {
 
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
+
+    private companion object {
+        const val TEST_PROXY_KEY: String = "test-prompt-proxy-api-key"
+    }
 
     private class FakeCompleter(
         private val result: LlmAttemptResult,
@@ -69,7 +75,7 @@ class PromptProxyRoutesTest {
                 install(ServerContentNegotiation) { json(json) }
                 routing {
                     val service = PromptProxyService(completer, defaultRoutingModel = serverDefaultModel)
-                    promptProxyRoutes(service)
+                    promptProxyRoutes(service, TEST_PROXY_KEY)
                 }
             }
             val client = createClient {
@@ -84,6 +90,7 @@ class PromptProxyRoutesTest {
             _ ->
         val res =
             post("/api/prompt/proxy") {
+                header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                 contentType(ContentType.Application.Json)
                 setBody(
                     PromptProxyRequest(
@@ -103,6 +110,7 @@ class PromptProxyRoutesTest {
             _ ->
         val res =
             post("/api/prompt/proxy") {
+                header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                 contentType(ContentType.Application.Json)
                 setBody(
                     PromptProxyRequest(
@@ -123,6 +131,7 @@ class PromptProxyRoutesTest {
                 completer ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -153,6 +162,7 @@ class PromptProxyRoutesTest {
                 _ ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -178,6 +188,7 @@ class PromptProxyRoutesTest {
                 _ ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody("{ not json")
                 }
@@ -195,6 +206,7 @@ class PromptProxyRoutesTest {
                 completer ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -216,6 +228,7 @@ class PromptProxyRoutesTest {
                 _ ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -243,6 +256,7 @@ class PromptProxyRoutesTest {
                 _ ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -280,6 +294,7 @@ class PromptProxyRoutesTest {
                 _ ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -304,6 +319,7 @@ class PromptProxyRoutesTest {
                 _ ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -329,6 +345,7 @@ class PromptProxyRoutesTest {
                 _ ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -352,6 +369,7 @@ class PromptProxyRoutesTest {
                 _ ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -377,6 +395,7 @@ class PromptProxyRoutesTest {
                 completer ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -407,6 +426,7 @@ class PromptProxyRoutesTest {
                 _ ->
             val res =
                 post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer $TEST_PROXY_KEY")
                     contentType(ContentType.Application.Json)
                     setBody(
                         PromptProxyRequest(
@@ -422,5 +442,44 @@ class PromptProxyRoutesTest {
             assertTrue(text.contains(""""text":"x""""))
             assertTrue(text.contains("event: error"))
             assertTrue(!text.contains("event: done"))
+        }
+
+    @Test
+    fun `unauthorized when prompt proxy bearer missing`() =
+        testRouting(completerResult = LlmAttemptResult.Success("should-not-run")) {
+            val res =
+                post("/api/prompt/proxy") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        PromptProxyRequest(
+                            style = "",
+                            prompt = "hello",
+                            language = "en",
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.Unauthorized, res.status)
+            val env = res.body<PromptProxyErrorEnvelope>()
+            assertTrue(env.error.message.contains("Unauthorized", ignoreCase = true))
+        }
+
+    @Test
+    fun `unauthorized when prompt proxy bearer wrong`() =
+        testRouting(completerResult = LlmAttemptResult.Success("should-not-run")) {
+            val res =
+                post("/api/prompt/proxy") {
+                    header(HttpHeaders.Authorization, "Bearer wrong-key")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        PromptProxyRequest(
+                            style = "",
+                            prompt = "hello",
+                            language = "en",
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.Unauthorized, res.status)
+            val env = res.body<PromptProxyErrorEnvelope>()
+            assertTrue(env.error.message.contains("Unauthorized", ignoreCase = true))
         }
 }

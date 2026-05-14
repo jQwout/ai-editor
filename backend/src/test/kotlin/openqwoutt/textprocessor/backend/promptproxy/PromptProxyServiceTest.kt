@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import openqwoutt.textprocessor.backend.shared.openrouter.ChatMessage
+import openqwoutt.textprocessor.backend.textprocessing.application.ProcessTextErrorDiagnostics
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -114,5 +115,36 @@ class PromptProxyServiceTest {
             val frames =
                 (prep as PromptProxyStreamPrepare.Frames).flow.toList()
             assertEquals(listOf(ProxyStreamFrame.Delta("a")), frames)
+        }
+
+    @Test
+    fun `run truncates huge provider raw with truncated flag`() =
+        runBlocking {
+            val huge = "x".repeat(ProcessTextErrorDiagnostics.MAX_PROVIDER_RAW_CHARS + 200)
+            val svc =
+                PromptProxyService(
+                    RecordingCompleter(
+                        LlmAttemptResult.Failure(
+                            message = "upstream",
+                            provider = "test-provider",
+                            httpStatus = 502,
+                            providerBody = null,
+                            providerRaw = huge,
+                        ),
+                    ),
+                    defaultRoutingModel = "m",
+                )
+            val r =
+                svc.run(
+                    PromptProxyRequest(
+                        style = "",
+                        prompt = "p",
+                        language = "en",
+                    ),
+                )
+            assertTrue(r is PromptProxyRunOutcome.Provider)
+            val d = (r as PromptProxyRunOutcome.Provider).detail
+            assertTrue(d.providerRawTruncated)
+            assertTrue((d.providerRaw ?: "").length <= ProcessTextErrorDiagnostics.MAX_PROVIDER_RAW_CHARS + 500)
         }
 }

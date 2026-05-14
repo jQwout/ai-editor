@@ -19,6 +19,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import openqwoutt.textprocessor.backend.limits.ADMIN_UPSERT_MAX_ITEMS
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -235,6 +236,25 @@ class PromptStoreRoutesTest {
         assertEquals(HttpStatusCode.OK, res.status)
         val body = res.body<AdminUpsertPromptsResponse>()
         assertEquals(2, body.upserted)
+    }
+
+    @Test
+    fun `bad request when batch exceeds maximum size`() = appTest { _ ->
+        val prompts =
+            List(ADMIN_UPSERT_MAX_ITEMS + 1) { i ->
+                AdminUpsertPromptRequest(
+                    modeId = "mode_batch_$i",
+                    modelId = null,
+                    promptText = "text $i",
+                    temperature = 0.4,
+                )
+            }
+        val res = post("/admin/prompts") {
+            header(HttpHeaders.Authorization, "Bearer secret")
+            contentType(ContentType.Application.Json)
+            setBody(AdminUpsertPromptsRequest(prompts = prompts))
+        }
+        assertEquals(HttpStatusCode.BadRequest, res.status)
     }
 }
 

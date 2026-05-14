@@ -1,7 +1,9 @@
 package openqwoutt.textprocessor.backend.promptproxy
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.cancellable
 import openqwoutt.textprocessor.backend.shared.openrouter.ChatMessage
+import openqwoutt.textprocessor.backend.textprocessing.application.ProcessTextErrorDiagnostics
 
 class PromptProxyService(
     private val llm: PromptProxyLlmCompleter,
@@ -24,16 +26,20 @@ class PromptProxyService(
 
                 return when (outcome) {
                     is LlmAttemptResult.Success -> PromptProxyRunOutcome.Ok(outcome.text)
-                    is LlmAttemptResult.Failure ->
+                    is LlmAttemptResult.Failure -> {
+                        val (raw, truncated) =
+                            ProcessTextErrorDiagnostics.truncateProviderRawWithFlag(outcome.providerRaw)
                         PromptProxyRunOutcome.Provider(
                             PromptProxyErrorDetail(
                                 message = outcome.message,
                                 provider = outcome.provider,
                                 httpStatus = outcome.httpStatus,
                                 providerBody = outcome.providerBody,
-                                providerRaw = outcome.providerRaw,
+                                providerRaw = raw,
+                                providerRawTruncated = truncated,
                             ),
                         )
+                    }
                 }
             }
         }
@@ -46,12 +52,14 @@ class PromptProxyService(
                 PromptProxyStreamPrepare.Validation(validated.detail)
             is PromptProxyValidateResult.Ok ->
                 PromptProxyStreamPrepare.Frames(
-                    llm.streamChat(
-                        model = validated.routingModel,
-                        messages = validated.messages,
-                        temperature = DEFAULT_TEMPERATURE,
-                        maxTokens = DEFAULT_MAX_TOKENS,
-                    ),
+                    llm
+                        .streamChat(
+                            model = validated.routingModel,
+                            messages = validated.messages,
+                            temperature = DEFAULT_TEMPERATURE,
+                            maxTokens = DEFAULT_MAX_TOKENS,
+                        )
+                        .cancellable(),
                 )
         }
 

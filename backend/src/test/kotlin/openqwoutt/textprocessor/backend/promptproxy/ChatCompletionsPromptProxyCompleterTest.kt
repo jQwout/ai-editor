@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import openqwoutt.textprocessor.backend.shared.openrouter.ChatMessage
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -167,6 +168,7 @@ class ChatCompletionsPromptProxyCompleterTest {
             val detail = (f as ProxyStreamFrame.Failed).detail
             assertEquals(401, detail.httpStatus)
             assertEquals(raw, detail.providerRaw)
+            assertFalse(detail.providerRawTruncated)
         }
 
     @Test

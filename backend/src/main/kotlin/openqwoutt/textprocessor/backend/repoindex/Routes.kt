@@ -9,6 +9,8 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import openqwoutt.textprocessor.backend.limits.ADMIN_UPSERT_MAX_ITEMS
+import openqwoutt.textprocessor.backend.security.secureEqualsUtf8Strings
 
 fun Route.repoIndexRoutes(service: PromptRegistryService, cfg: RepoIndexConfig) {
     get("/repoindex/health") {
@@ -69,6 +71,7 @@ fun Route.repoIndexRoutes(service: PromptRegistryService, cfg: RepoIndexConfig) 
     post("/repoindex/admin/models") {
         if (!call.requireAdmin(cfg)) return@post
         val body = call.receive<AdminUpsertModelsRequest>()
+        if (!call.requireAdminBatchSize(body.models.size, "models")) return@post
         service.upsertModels(body.models)
         call.respond(mapOf("status" to "ok", "upserted" to body.models.size))
     }
@@ -76,6 +79,8 @@ fun Route.repoIndexRoutes(service: PromptRegistryService, cfg: RepoIndexConfig) 
     post("/repoindex/admin/prompts") {
         if (!call.requireAdmin(cfg)) return@post
         val body = call.receive<AdminUpsertPromptsRequest>()
+        val batchTotal = body.basePrompts.size + body.overrides.size
+        if (!call.requireAdminBatchSize(batchTotal, "basePrompts+overrides")) return@post
         service.upsertPrompts(body)
         call.respond(
             mapOf(
@@ -112,6 +117,7 @@ fun Route.publicPromptRoutes(publicPromptService: PublicPromptService, cfg: Repo
     post("/repoindex/admin/public-prompts") {
         if (!call.requireAdmin(cfg)) return@post
         val body = call.receive<AdminUpsertPublicPromptsRequest>()
+        if (!call.requireAdminBatchSize(body.prompts.size, "prompts")) return@post
         val upserted = publicPromptService.upsertPrompts(
             body.prompts.map {
                 PublicPromptRow(
@@ -132,6 +138,7 @@ fun Route.publicRepoIngestRoutes(ingestor: PublicRepoIngestor, cfg: RepoIndexCon
     post("/repoindex/admin/public-repos/ingest") {
         if (!call.requireAdmin(cfg)) return@post
         val body = call.receive<AdminIngestPublicReposRequest>()
+        if (!call.requireAdminBatchSize(body.repoUrls.size, "repoUrls")) return@post
         val results = buildList {
             for (repoUrl in body.repoUrls) {
                 add(ingestor.ingestGithubRepo(repoUrl))
@@ -145,6 +152,7 @@ fun Route.publicRepoSourceRoutes(repoSourceService: PublicRepoSourceService, cfg
     post("/repoindex/admin/public-repos") {
         if (!call.requireAdmin(cfg)) return@post
         val body = call.receive<AdminUpsertPublicReposRequest>()
+        if (!call.requireAdminBatchSize(body.repoUrls.size, "repoUrls")) return@post
         repoSourceService.upsertGithubRepos(body.repoUrls)
         call.respond(AdminUpsertedResponseDto(upserted = body.repoUrls.size))
     }
@@ -183,9 +191,21 @@ private suspend fun ApplicationCall.requireAdmin(cfg: RepoIndexConfig): Boolean 
     }
     val header = request.headers[HttpHeaders.Authorization].orEmpty()
     val token = header.removePrefix("Bearer ").trim()
-    if (token != expected) {
+    if (!secureEqualsUtf8Strings(token, expected)) {
         respond(HttpStatusCode.Unauthorized, mapOf("error" to "Unauthorized"))
         return false
     }
     return true
+}
+
+private suspend fun ApplicationCall.requireAdminBatchSize(count: Int, label: String): Boolean {
+    if (count <= ADMIN_UPSERT_MAX_ITEMS) return true
+    respond(
+        HttpStatusCode.BadRequest,
+        mapOf(
+            "error" to
+                "$label exceeds maximum size ($ADMIN_UPSERT_MAX_ITEMS). Split into smaller requests.",
+        ),
+    )
+    return false
 }

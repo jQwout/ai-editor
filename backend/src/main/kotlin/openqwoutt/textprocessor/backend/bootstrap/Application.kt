@@ -16,6 +16,8 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import kotlinx.serialization.json.Json
 import openqwoutt.textprocessor.backend.composition.PromptRegistryCatalogAdapter
 import openqwoutt.textprocessor.backend.promptproxy.PromptProxyFeature
@@ -44,8 +46,13 @@ fun Application.module() {
     RepoIndexFeature.install(this)
     PromptStoreFeature.install(this, json)
 
-    val llmRt: LlmUpstreamRuntime? = createLlmUpstreamRuntime(json)
+    val prometheusRegistry = createOptionalPrometheusRegistry()
+    val llmMeterRegistry: MeterRegistry? = prometheusRegistry
 
+    val llmRt: LlmUpstreamRuntime? = createLlmUpstreamRuntime(json, llmMeterRegistry)
+
+    val promptProxyApiKey =
+        System.getenv("PROMPT_PROXY_API_KEY")?.trim()?.takeIf { it.isNotEmpty() }
     PromptProxyFeature.install(
         application = this,
         json = json,
@@ -53,6 +60,8 @@ fun Application.module() {
         chatCompletionsUrl = llmRt?.chatCompletionsUrl,
         providerId = llmRt?.providerId,
         routingModel = resolvePromptProxyRoutingModel(llmRt),
+        promptProxyApiKey = promptProxyApiKey,
+        meterRegistry = llmMeterRegistry,
     )
 
     install(CallLogging)
@@ -76,6 +85,10 @@ fun Application.module() {
     }
 
     installTextProcessingRoutes(processTextUseCase)
+
+    installLlmOutboundRateLimitFromEnvironment()
+
+    prometheusRegistry?.let { installPrometheusScrapeRoute(it) }
 }
 
 private const val OPENROUTER_CHAT_COMPLETIONS_URL: String = "https://openrouter.ai/api/v1/chat/completions"
@@ -88,22 +101,22 @@ private data class LlmUpstreamRuntime(
     val providerId: String,
 )
 
-private fun Application.createLlmUpstreamRuntime(json: Json): LlmUpstreamRuntime? {
+private fun Application.createLlmUpstreamRuntime(json: Json, meterRegistry: MeterRegistry?): LlmUpstreamRuntime? {
     val provider = System.getenv("LLM_PROVIDER")?.trim()?.lowercase() ?: "openrouter"
 
     return when (provider) {
         "nvidia", "nim" ->
-            runCatching { createNvidiaRuntime(json) }
+            runCatching { createNvidiaRuntime(json, meterRegistry) }
                 .onFailure { log.warn("NVIDIA LLM disabled: ${it.message}", it) }
                 .getOrNull()
         else ->
-            runCatching { createOpenRouterRuntime(json) }
+            runCatching { createOpenRouterRuntime(json, meterRegistry) }
                 .onFailure { log.warn("OpenRouter LLM disabled: ${it.message}", it) }
                 .getOrNull()
     }
 }
 
-private fun Application.createOpenRouterRuntime(json: Json): LlmUpstreamRuntime {
+private fun Application.createOpenRouterRuntime(json: Json, meterRegistry: MeterRegistry?): LlmUpstreamRuntime {
     val config = OpenRouterConnectionConfig.fromEnvironment()
     val client =
         createLlmHttpClient(json) {
@@ -120,6 +133,7 @@ private fun Application.createOpenRouterRuntime(json: Json): LlmUpstreamRuntime 
             chatCompletionsUrl = OPENROUTER_CHAT_COMPLETIONS_URL,
             providerId = "openrouter",
             json = json,
+            meterRegistry = meterRegistry,
         )
     return LlmUpstreamRuntime(
         httpClient = client,
@@ -130,7 +144,7 @@ private fun Application.createOpenRouterRuntime(json: Json): LlmUpstreamRuntime 
     )
 }
 
-private fun Application.createNvidiaRuntime(json: Json): LlmUpstreamRuntime {
+private fun Application.createNvidiaRuntime(json: Json, meterRegistry: MeterRegistry?): LlmUpstreamRuntime {
     val config = NvidiaConnectionConfig.fromEnvironment()
     val client =
         createLlmHttpClient(json) {
@@ -145,6 +159,7 @@ private fun Application.createNvidiaRuntime(json: Json): LlmUpstreamRuntime {
             chatCompletionsUrl = config.chatCompletionsUrl,
             providerId = "nvidia",
             json = json,
+            meterRegistry = meterRegistry,
         )
     return LlmUpstreamRuntime(
         httpClient = client,

@@ -46,4 +46,6 @@ data class PromptProxyErrorDetail(
     val httpStatus: Int? = null,
     val providerBody: JsonElement? = null,
     val providerRaw: String? = null,
+    /** True when [providerRaw] was shortened from the upstream payload (see diagnostics max length). */
+    val providerRawTruncated: Boolean = false,
 )

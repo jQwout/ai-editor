@@ -10,8 +10,10 @@ import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readUTF8Line
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import openqwoutt.textprocessor.backend.shared.openrouter.ChatCompletionStreamChunk
@@ -19,6 +21,8 @@ import openqwoutt.textprocessor.backend.shared.openrouter.ChatCompletionStreamDe
 import openqwoutt.textprocessor.backend.shared.openrouter.ChatMessage
 import openqwoutt.textprocessor.backend.shared.openrouter.OpenRouterChatRequest
 import openqwoutt.textprocessor.backend.shared.openrouter.OpenRouterChatResponse
+import openqwoutt.textprocessor.backend.observability.recordLlmRequest
+import openqwoutt.textprocessor.backend.textprocessing.application.ProcessTextErrorDiagnostics
 import org.slf4j.LoggerFactory
 
 interface PromptProxyLlmCompleter {
@@ -61,6 +65,7 @@ class ChatCompletionsPromptProxyCompleter(
     private val json: Json,
     private val chatCompletionsUrl: String,
     private val providerId: String,
+    private val meterRegistry: MeterRegistry? = null,
 ) : PromptProxyLlmCompleter {
 
     private val logger = LoggerFactory.getLogger(ChatCompletionsPromptProxyCompleter::class.java)
@@ -70,76 +75,100 @@ class ChatCompletionsPromptProxyCompleter(
         messages: List<ChatMessage>,
         temperature: Double,
         maxTokens: Int,
-    ): LlmAttemptResult =
-        try {
-            val response = httpClient.post(chatCompletionsUrl) {
-                setBody(
-                    OpenRouterChatRequest(
-                        model = model,
-                        messages = messages,
-                        maxTokens = maxTokens,
-                        temperature = temperature,
-                        stream = false,
-                    ),
-                )
-            }
-            val status = response.status
-            val raw =
-                response.body<ByteArray>()
-                    .decodeToString()
-
-            when {
-                status.isSuccess() -> {
-                    runCatching { json.decodeFromString(OpenRouterChatResponse.serializer(), raw) }
-                        .fold(
-                            onSuccess = { decoded ->
-                                val text =
-                                    decoded.choices.firstOrNull()?.message?.content?.trim().orEmpty()
-                                if (text.isNotBlank()) {
-                                    LlmAttemptResult.Success(text)
-                                } else {
-                                    LlmAttemptResult.Failure(
-                                        message = "Model returned empty content.",
-                                        provider = providerId,
-                                        httpStatus = status.value,
-                                        providerBody = parseJsonOrNull(raw),
-                                        providerRaw = raw,
-                                    )
-                                }
-                            },
-                            onFailure = { err ->
-                                LlmAttemptResult.Failure(
-                                    message =
-                                        "Could not decode chat/completions response (provider=$providerId): ${err.message}",
-                                    provider = providerId,
-                                    httpStatus = status.value,
-                                    providerBody = null,
-                                    providerRaw = raw,
-                                )
-                            },
-                        )
-                }
-                else -> {
-                    val element = parseJsonOrNull(raw)
-                    LlmAttemptResult.Failure(
-                        message = "LLM upstream HTTP ${status.value} (provider=$providerId).",
-                        provider = providerId,
-                        httpStatus = status.value,
-                        providerBody = element,
-                        providerRaw = raw,
+    ): LlmAttemptResult {
+        val startNs = System.nanoTime()
+        val result =
+            try {
+                val response = httpClient.post(chatCompletionsUrl) {
+                    setBody(
+                        OpenRouterChatRequest(
+                            model = model,
+                            messages = messages,
+                            maxTokens = maxTokens,
+                            temperature = temperature,
+                            stream = false,
+                        ),
                     )
                 }
+                val status = response.status
+                val raw =
+                    response.body<ByteArray>()
+                        .decodeToString()
+
+                when {
+                    status.isSuccess() -> {
+                        runCatching { json.decodeFromString(OpenRouterChatResponse.serializer(), raw) }
+                            .fold(
+                                onSuccess = { decoded ->
+                                    val text =
+                                        decoded.choices.firstOrNull()?.message?.content?.trim().orEmpty()
+                                    if (text.isNotBlank()) {
+                                        LlmAttemptResult.Success(text)
+                                    } else {
+                                        LlmAttemptResult.Failure(
+                                            message = "Model returned empty content.",
+                                            provider = providerId,
+                                            httpStatus = status.value,
+                                            providerBody = parseJsonOrNull(raw),
+                                            providerRaw = raw,
+                                        )
+                                    }
+                                },
+                                onFailure = { err ->
+                                    LlmAttemptResult.Failure(
+                                        message =
+                                            "Could not decode chat/completions response (provider=$providerId): ${err.message}",
+                                        provider = providerId,
+                                        httpStatus = status.value,
+                                        providerBody = null,
+                                        providerRaw = raw,
+                                    )
+                                },
+                            )
+                    }
+                    else -> {
+                        val element = parseJsonOrNull(raw)
+                        LlmAttemptResult.Failure(
+                            message = "LLM upstream HTTP ${status.value} (provider=$providerId).",
+                            provider = providerId,
+                            httpStatus = status.value,
+                            providerBody = element,
+                            providerRaw = raw,
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                logger.warn("Prompt proxy completeChat failed (provider=$providerId)", e)
+                LlmAttemptResult.Failure(
+                    message = e.message ?: "${e::class.simpleName}",
+                    provider = providerId,
+                    httpStatus = null,
+                    providerBody = null,
+                    providerRaw = null,
+                )
             }
-        } catch (e: Exception) {
-            logger.warn("Prompt proxy completeChat failed (provider=$providerId)", e)
-            LlmAttemptResult.Failure(
-                message = e.message ?: "${e::class.simpleName}",
-                provider = providerId,
-                httpStatus = null,
-                providerBody = null,
-                providerRaw = null,
-            )
+        val durationMs = (System.nanoTime() - startNs) / 1_000_000L
+        when (result) {
+            is LlmAttemptResult.Success ->
+                logger.info(
+                    "prompt-proxy completeChat ok provider={} model={} durationMs={}",
+                    providerId,
+                    model,
+                    durationMs,
+                )
+            is LlmAttemptResult.Failure ->
+                logger.warn(
+                    "prompt-proxy completeChat failure provider={} model={} durationMs={} message={}",
+                    providerId,
+                    model,
+                    durationMs,
+                    result.message,
+                )
         }
+        val success = result is LlmAttemptResult.Success
+        meterRegistry.recordLlmRequest(providerId, "prompt.proxy.complete", durationMs, success)
+        return result
+    }
 
     override fun streamChat(
         model: String,
@@ -148,6 +177,8 @@ class ChatCompletionsPromptProxyCompleter(
         maxTokens: Int,
     ): Flow<ProxyStreamFrame> =
         flow {
+            val startedNs = System.nanoTime()
+            var transportOk = true
             try {
                 val streamTimeout = streamRequestTimeoutMillis()
                 val response =
@@ -172,9 +203,8 @@ class ChatCompletionsPromptProxyCompleter(
                     val raw = response.body<ByteArray>().decodeToString()
                     emit(
                         ProxyStreamFrame.Failed(
-                            PromptProxyErrorDetail(
+                            streamErrorDetail(
                                 message = "LLM upstream HTTP ${status.value} (provider=$providerId).",
-                                provider = providerId,
                                 httpStatus = status.value,
                                 providerBody = parseJsonOrNull(raw),
                                 providerRaw = raw,
@@ -187,6 +217,7 @@ class ChatCompletionsPromptProxyCompleter(
                 val channel = response.bodyAsChannel()
                 var malformedStreak = 0
                 while (true) {
+                    yield()
                     val line = channel.readUTF8Line() ?: break
                     val trimmed = line.trim()
                     if (trimmed.isEmpty()) continue
@@ -209,11 +240,10 @@ class ChatCompletionsPromptProxyCompleter(
                             if (malformedStreak >= MAX_MALFORMED_SSE_LINES) {
                                 emit(
                                     ProxyStreamFrame.Failed(
-                                        PromptProxyErrorDetail(
+                                        streamErrorDetail(
                                             message =
                                                 "Upstream stream repeated invalid JSON lines " +
                                                     "(provider=$providerId).",
-                                            provider = providerId,
                                             httpStatus = null,
                                             providerBody = null,
                                             providerRaw = null,
@@ -226,20 +256,46 @@ class ChatCompletionsPromptProxyCompleter(
                     }
                 }
             } catch (e: Exception) {
+                transportOk = false
                 logger.warn("Prompt proxy streamChat failed (provider=$providerId)", e)
                 emit(
                     ProxyStreamFrame.Failed(
-                        PromptProxyErrorDetail(
+                        streamErrorDetail(
                             message = e.message ?: "${e::class.simpleName}",
-                            provider = providerId,
                             httpStatus = null,
                             providerBody = null,
                             providerRaw = null,
                         ),
                     ),
                 )
+            } finally {
+                val ms = (System.nanoTime() - startedNs) / 1_000_000L
+                meterRegistry.recordLlmRequest(providerId, "prompt.proxy.stream", ms, transportOk)
+                logger.info(
+                    "prompt-proxy streamChat finished provider={} model={} durationMs={}",
+                    providerId,
+                    model,
+                    ms,
+                )
             }
         }
+
+    private fun streamErrorDetail(
+        message: String,
+        httpStatus: Int?,
+        providerBody: JsonElement?,
+        providerRaw: String?,
+    ): PromptProxyErrorDetail {
+        val (r, t) = ProcessTextErrorDiagnostics.truncateProviderRawWithFlag(providerRaw)
+        return PromptProxyErrorDetail(
+            message = message,
+            provider = providerId,
+            httpStatus = httpStatus,
+            providerBody = providerBody,
+            providerRaw = r,
+            providerRawTruncated = t,
+        )
+    }
 
     private fun parseStreamDataPayload(jsonLine: String): ParsedStreamPayload {
         val chunk =
