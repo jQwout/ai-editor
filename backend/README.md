@@ -4,13 +4,39 @@ Ktor proxy for OpenRouter. Keep the OpenRouter key here, never in the Android ap
 
 ## Run
 
-PowerShell:
+PowerShell (OpenRouter — по умолчанию, `LLM_PROVIDER` можно не задавать):
 
 ```powershell
 $env:OPENROUTER_API_KEY="sk-or-v1-..."
 $env:OPENROUTER_MODEL="openai/gpt-4o-mini"
 .\gradlew.bat :backend:run
 ```
+
+### NVIDIA (NIM / API catalog, OpenAI-совместимый chat)
+
+```powershell
+$env:LLM_PROVIDER="nvidia"
+$env:NVIDIA_API_KEY="nvapi-..."
+# опционально:
+# $env:NVIDIA_CHAT_COMPLETIONS_URL="https://integrate.api.nvidia.com/v1/chat/completions"
+# $env:NVIDIA_MODEL="meta/llama-3.1-8b-instruct"
+.\gradlew.bat :backend:run
+```
+
+Переменные:
+
+- `LLM_PROVIDER` — `openrouter` (по умолчанию) или `nvidia` / `nim`.
+- Для prompt proxy модель по умолчанию: `LLM_PROMPT_PROXY_MODEL` или устаревшее `OPENROUTER_PROMPT_PROXY_MODEL`, иначе `OPENROUTER_MODEL` / `NVIDIA_MODEL` в зависимости от провайдера.
+
+### Тесты (`:backend:test`)
+
+Юнит‑тесты: `ChatCompletionsLlmAdapter`, конфиги OpenRouter/NVIDIA, `ProcessTextUseCase`, `TextProcessingRoutes`, обрезка диагностик.
+
+```powershell
+.\gradlew.bat :backend:test
+```
+
+Если Gradle падает с `Could not find or load main class worker.org.gradle.process.internal.worker.GradleWorkerMain`, это сбой classpath воркера Gradle/JDK на машине (не код тестов). Имеет смысл запустить тесты из **Android Studio / IntelliJ** по модулю `backend`, либо переустановить/обновить Gradle wrapper и использовать **JDK 17** для Gradle.
 
 ## Prompt store (админская загрузка промптов в Postgres)
 
@@ -116,6 +142,8 @@ Response:
 ```json
 { "status": "ok", "upserted": 2 }
 ```
+
+`upserted` — сколько промптов из пачки применено (вставка или обновление). Все операции выполняются в **одной транзакции**: при ошибке на любом элементе откатываются все.
 
 ### Пример вызова (PowerShell)
 

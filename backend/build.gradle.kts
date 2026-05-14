@@ -18,6 +18,8 @@ kotlin {
 }
 
 tasks.withType<Test>().configureEach {
+    maxParallelForks = 1
+
     // Force test executors to use JDK 17 (some machines default to newer JDKs like 25)
     javaLauncher.set(
         javaToolchains.launcherFor {
@@ -32,7 +34,7 @@ tasks.withType<Test>().configureEach {
 }
 
 application {
-    mainClass.set("openqwoutt.textprocessor.backend.ApplicationKt")
+    mainClass.set("openqwoutt.textprocessor.backend.bootstrap.ApplicationKt")
     applicationName = "backend"
 }
 
@@ -55,6 +57,7 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
+    testImplementation("io.ktor:ktor-client-mock:$ktorVersion")
     testImplementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     testImplementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")

@@ -27,14 +27,16 @@ fun Route.promptStoreRoutes(service: PromptStoreService, cfg: PromptStoreConfig)
     post("/admin/prompts") {
         if (!call.requirePromptAdmin(cfg)) return@post
         val body = call.receive<AdminUpsertPromptsRequest>()
-        var upserted = 0
-        for (p in body.prompts) {
-            val merged = p.mergeDefaults(origin = body.origin, raw = body.raw)
-            val validated = merged.validateOrRespond(call) ?: return@post
-            val res = service.upsertPrompt(validated)
-            if (res.upserted) upserted++
-        }
-        call.respond(AdminUpsertPromptsResponse(upserted = upserted))
+        val validated =
+            buildList(capacity = body.prompts.size) {
+                for (p in body.prompts) {
+                    val merged = p.mergeDefaults(origin = body.origin, raw = body.raw)
+                    val v = merged.validateOrRespond(call) ?: return@post
+                    add(v)
+                }
+            }
+        val results = service.upsertPromptBatch(validated)
+        call.respond(AdminUpsertPromptsResponse(upserted = results.size))
     }
 }
 
