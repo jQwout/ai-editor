@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.CopyAll
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -284,6 +285,24 @@ private fun MainContent(
                 onAction = onAction,
                 clipboard = clipboard
             )
+
+            // Voice Input Panel
+            AnimatedVisibility(
+                visible = state.showVoiceInput,
+                enter = expandVertically(
+                    animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                ) + fadeIn(tween(ANIMATION_DURATION)),
+                exit = shrinkVertically(
+                    animationSpec = tween(ANIMATION_DURATION, easing = FastOutSlowInEasing)
+                ) + fadeOut(tween(ANIMATION_DURATION))
+            ) {
+                VoiceInputPanel(
+                    state = state.voiceInputPanelState,
+                    onAction = onAction,
+                    onInsertTranslation = { onAction(TextStylerAction.InsertVoiceTranslation) },
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+            }
         }
     }
 }
@@ -627,6 +646,24 @@ private fun InputCard(
                         contentDescription = "Templates",
                         tint = TextSecondary,
                         modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Voice Input button
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (state.showVoiceInput) AccentSoft else CardBg)
+                        .border(1.dp, if (state.showVoiceInput) Accent else Divider, RoundedCornerShape(10.dp))
+                        .clickable { onAction(TextStylerAction.ToggleVoiceInput) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Voice Input",
+                        tint = if (state.showVoiceInput) Accent else TextSecondary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

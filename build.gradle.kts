@@ -90,6 +90,12 @@ dependencies {
     ksp("androidx.room:room-compiler:2.7.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
+    // Google ML Kit for voice input and translation
+    implementation("com.google.mlkit:translate:17.0.2")
+
+    // Coroutines for testing
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
