@@ -101,9 +101,14 @@ data class SettingsState(
     val aiModel: String = "meta/llama-3.1-70b-instruct",
     val apiKey: String = "",
     val language: String = "English",
-    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val themeMode: ThemeMode = ThemeMode.AUTO,
     val customBackendEnabled: Boolean = false,
-    val customBackendUrl: String = ""
+    val customBackendUrl: String = "",
+    val autoPaste: Boolean = true,
+    val autoCopyResult: Boolean = true,
+    val soundEffects: Boolean = false,
+    val hapticFeedback: Boolean = true,
+    val useStreaming: Boolean = true
 )
 
 // ============================================================================
@@ -186,7 +191,7 @@ fun SettingsScreen(
             SettingsState(
                 aiModel = settings.effectiveModel(),
                 apiKey = settings.apiKey,
-                themeMode = ThemeMode.LIGHT
+                themeMode = ThemeMode.AUTO
             )
         )
     }
@@ -262,7 +267,12 @@ fun SettingsScreen(
                                     aiModel = state.aiModel,
                                     apiKey = state.apiKey,
                                     useBackend = state.customBackendEnabled,
-                                    backendUrl = state.customBackendUrl
+                                    backendUrl = state.customBackendUrl,
+                                    autoPaste = state.autoPaste,
+                                    autoCopyResult = state.autoCopyResult,
+                                    soundEffects = state.soundEffects,
+                                    hapticFeedback = state.hapticFeedback,
+                                    useStreaming = state.useStreaming
                                 )
                             )
                             onBack()
