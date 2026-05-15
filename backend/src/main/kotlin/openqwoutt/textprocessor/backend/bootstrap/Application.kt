@@ -21,6 +21,7 @@ import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import kotlinx.serialization.json.Json
 import openqwoutt.textprocessor.backend.composition.PromptRegistryCatalogAdapter
 import openqwoutt.textprocessor.backend.promptproxy.PromptProxyFeature
+import openqwoutt.textprocessor.backend.modelscatalog.ModelsCatalogFeature
 import openqwoutt.textprocessor.backend.promptstore.PromptStoreFeature
 import openqwoutt.textprocessor.backend.repoindex.PromptRegistryServiceKey
 import openqwoutt.textprocessor.backend.repoindex.RepoIndexFeature
@@ -47,6 +48,7 @@ fun Application.module() {
     PromptStoreFeature.install(this, json)
 
     val prometheusRegistry = createOptionalPrometheusRegistry()
+    ModelsCatalogFeature.install(this, meterRegistry = prometheusRegistry)
     val llmMeterRegistry: MeterRegistry? = prometheusRegistry
 
     val llmRt: LlmUpstreamRuntime? = createLlmUpstreamRuntime(json, llmMeterRegistry)

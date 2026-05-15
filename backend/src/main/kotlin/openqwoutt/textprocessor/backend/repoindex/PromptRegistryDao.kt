@@ -1,6 +1,7 @@
 package openqwoutt.textprocessor.backend.repoindex
 
 import java.sql.ResultSet
+import java.sql.Types
 import javax.sql.DataSource
 
 data class AiModelRow(
@@ -166,8 +167,8 @@ class PromptRegistryDao(private val ds: DataSource) {
                 """.trimIndent()
             ).use { ps ->
                 ps.setString(1, modeId)
-                if (promptTextOverride != null) ps.setString(2, promptTextOverride) else ps.setNull(2, java.sql.Types.VARCHAR)
-                if (temperatureOverride != null) ps.setDouble(3, temperatureOverride) else ps.setNull(3, java.sql.Types.DOUBLE)
+                if (promptTextOverride != null) ps.setString(2, promptTextOverride) else ps.setNull(2, Types.VARCHAR)
+                if (temperatureOverride != null) ps.setDouble(3, temperatureOverride) else ps.setNull(3, Types.DOUBLE)
                 ps.setString(4, openRouterModelId)
                 ps.executeUpdate()
             }

@@ -1,9 +1,11 @@
 # Prompt Registry (models → prompts)
 
-Сервис хранит **только**:
-- список моделей OpenRouter (`ai_model`)
+Сервис **Repo Index / Prompt Registry** хранит:
+- модели OpenRouter в `ai_model` (для `/repoindex/prompts` и admin upsert)
 - базовые промты по режимам (`prompt`)
 - опциональные overrides для пары (модель × режим) (`model_prompt`)
+
+Каталог **NVIDIA** — отдельный сервис: см. [models-catalog-service.md](models-catalog-service.md) (`/models-catalog/*`, таблица `nvidia_model`).
 
 Хранения репозиториев / git-клонов нет.
 
@@ -41,13 +43,15 @@
 
 ### `GET /repoindex/models`
 
-Возвращает включённые модели из `ai_model`:
+Возвращает включённые модели OpenRouter из `ai_model` (для prompt registry):
 
 ```json
 [
   { "modelId": "google/gemini-2.0-flash-exp:free", "displayName": "Gemini 2.0 Flash (free)" }
 ]
 ```
+
+Каталог NVIDIA — отдельный сервис: [models-catalog-service.md](models-catalog-service.md).
 
 ### `GET /repoindex/prompts?model=<model_id>`
 

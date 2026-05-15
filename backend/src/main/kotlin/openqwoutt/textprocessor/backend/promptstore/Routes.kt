@@ -1,6 +1,5 @@
 package openqwoutt.textprocessor.backend.promptstore
 
-import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
@@ -9,12 +8,12 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import kotlinx.serialization.json.JsonObject
+import openqwoutt.textprocessor.backend.admin.requireAdminBearerToken
 import openqwoutt.textprocessor.backend.limits.ADMIN_UPSERT_MAX_ITEMS
-import openqwoutt.textprocessor.backend.security.secureEqualsUtf8Strings
 
 fun Route.promptStoreRoutes(service: PromptStoreService, cfg: PromptStoreConfig) {
     post("/admin/prompt") {
-        if (!call.requirePromptAdmin(cfg)) return@post
+        if (!call.requireAdminBearerToken(cfg.adminToken)) return@post
         val body = call.receive<AdminUpsertPromptRequest>()
         val validated = body.validateOrRespond(call) ?: return@post
         val res = service.upsertPrompt(validated)
@@ -27,7 +26,7 @@ fun Route.promptStoreRoutes(service: PromptStoreService, cfg: PromptStoreConfig)
     }
 
     post("/admin/prompts") {
-        if (!call.requirePromptAdmin(cfg)) return@post
+        if (!call.requireAdminBearerToken(cfg.adminToken)) return@post
         val body = call.receive<AdminUpsertPromptsRequest>()
         if (body.prompts.size > ADMIN_UPSERT_MAX_ITEMS) {
             call.respond(
@@ -51,21 +50,6 @@ fun Route.promptStoreRoutes(service: PromptStoreService, cfg: PromptStoreConfig)
         val results = service.upsertPromptBatch(validated)
         call.respond(AdminUpsertPromptsResponse(upserted = results.size))
     }
-}
-
-private suspend fun ApplicationCall.requirePromptAdmin(cfg: PromptStoreConfig): Boolean {
-    val expected = cfg.adminToken
-    if (expected == null) {
-        respond(HttpStatusCode.NotFound, mapOf("error" to "Admin API disabled"))
-        return false
-    }
-    val header = request.headers[HttpHeaders.Authorization].orEmpty()
-    val token = header.removePrefix("Bearer ").trim()
-    if (!secureEqualsUtf8Strings(token, expected)) {
-        respond(HttpStatusCode.Unauthorized, mapOf("error" to "Unauthorized"))
-        return false
-    }
-    return true
 }
 
 private suspend fun AdminUpsertPromptRequest.validateOrRespond(call: ApplicationCall): AdminUpsertPromptRequest? {

@@ -201,6 +201,18 @@ docker run --rm -v ${PWD}\backend:/app -w /app gradle:8.13-jdk17 gradle test
 
 Note: if you run the backend as `gradle run` from a bind-mounted folder and in parallel start another Gradle build in a container on the same mount, you can hit a `.gradle` lock. Avoid running multiple Gradle processes against the same mounted `/app`, or set an isolated `GRADLE_USER_HOME` for one of them.
 
+## Models catalog (NVIDIA, отдельный сервис)
+
+Документация: `backend/docs/models-catalog-service.md`.
+
+Включение: `MODELS_CATALOG_ENABLED=true` + Postgres (`MODELS_CATALOG_PG_*`).
+
+На dev: `MODELS_CATALOG_DEV_FALLBACK_PG=true` разрешает fallback на `PG_*` (как repoindex).
+
+- `GET /models-catalog/models` — каталог NVIDIA (ETag `"nvidia-<ms>-<count>-<maxId>"` / `304`)
+- `POST /models-catalog/admin/sync` — атомарный snapshot от бота (`MODELS_CATALOG_ADMIN_TOKEN` + Bearer)
+- Опционально: `MODELS_CATALOG_SYNC_RATE_LIMIT_PER_MINUTE` — rate limit на sync
+
 ## Prompt registry (models / prompts in Postgres)
 
 Документация: `backend/docs/prompt-registry.md`.
