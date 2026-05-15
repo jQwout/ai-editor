@@ -1,6 +1,5 @@
 package openqwoutt.textprocessor.backend.promptstore
 
-import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
@@ -9,10 +8,12 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import kotlinx.serialization.json.JsonObject
+import openqwoutt.textprocessor.backend.admin.requireAdminBearerToken
+import openqwoutt.textprocessor.backend.limits.ADMIN_UPSERT_MAX_ITEMS
 
 fun Route.promptStoreRoutes(service: PromptStoreService, cfg: PromptStoreConfig) {
     post("/admin/prompt") {
-        if (!call.requirePromptAdmin(cfg)) return@post
+        if (!call.requireAdminBearerToken(cfg.adminToken)) return@post
         val body = call.receive<AdminUpsertPromptRequest>()
         val validated = body.validateOrRespond(call) ?: return@post
         val res = service.upsertPrompt(validated)
@@ -25,32 +26,30 @@ fun Route.promptStoreRoutes(service: PromptStoreService, cfg: PromptStoreConfig)
     }
 
     post("/admin/prompts") {
-        if (!call.requirePromptAdmin(cfg)) return@post
+        if (!call.requireAdminBearerToken(cfg.adminToken)) return@post
         val body = call.receive<AdminUpsertPromptsRequest>()
-        var upserted = 0
-        for (p in body.prompts) {
-            val merged = p.mergeDefaults(origin = body.origin, raw = body.raw)
-            val validated = merged.validateOrRespond(call) ?: return@post
-            val res = service.upsertPrompt(validated)
-            if (res.upserted) upserted++
+        if (body.prompts.size > ADMIN_UPSERT_MAX_ITEMS) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf(
+                    "error" to
+                        "Batch exceeds maximum size ($ADMIN_UPSERT_MAX_ITEMS). " +
+                            "Split the import into smaller requests.",
+                ),
+            )
+            return@post
         }
-        call.respond(AdminUpsertPromptsResponse(upserted = upserted))
+        val validated =
+            buildList(capacity = body.prompts.size) {
+                for (p in body.prompts) {
+                    val merged = p.mergeDefaults(origin = body.origin, raw = body.raw)
+                    val v = merged.validateOrRespond(call) ?: return@post
+                    add(v)
+                }
+            }
+        val results = service.upsertPromptBatch(validated)
+        call.respond(AdminUpsertPromptsResponse(upserted = results.size))
     }
-}
-
-private suspend fun ApplicationCall.requirePromptAdmin(cfg: PromptStoreConfig): Boolean {
-    val expected = cfg.adminToken
-    if (expected == null) {
-        respond(HttpStatusCode.NotFound, mapOf("error" to "Admin API disabled"))
-        return false
-    }
-    val header = request.headers[HttpHeaders.Authorization].orEmpty()
-    val token = header.removePrefix("Bearer ").trim()
-    if (token != expected) {
-        respond(HttpStatusCode.Unauthorized, mapOf("error" to "Unauthorized"))
-        return false
-    }
-    return true
 }
 
 private suspend fun AdminUpsertPromptRequest.validateOrRespond(call: ApplicationCall): AdminUpsertPromptRequest? {
