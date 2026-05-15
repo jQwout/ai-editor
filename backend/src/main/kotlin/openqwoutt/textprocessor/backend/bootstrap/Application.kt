@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import kotlinx.serialization.json.Json
 import openqwoutt.textprocessor.backend.composition.PromptRegistryCatalogAdapter
+import openqwoutt.textprocessor.backend.nvidiaproxy.NvidiaProxyFeature
 import openqwoutt.textprocessor.backend.promptproxy.PromptProxyFeature
 import openqwoutt.textprocessor.backend.modelscatalog.ModelsCatalogFeature
 import openqwoutt.textprocessor.backend.promptstore.PromptStoreFeature
@@ -65,6 +66,7 @@ fun Application.module() {
         promptProxyApiKey = promptProxyApiKey,
         meterRegistry = llmMeterRegistry,
     )
+    NvidiaProxyFeature.install(this)
 
     install(CallLogging)
     install(ContentNegotiation) {

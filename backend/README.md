@@ -30,6 +30,12 @@ $env:PROMPT_PROXY_API_KEY="your-long-random-proxy-secret"
 - `LLM_PROVIDER` — `openrouter` (по умолчанию) или `nvidia` / `nim`.
 - **`PROMPT_PROXY_API_KEY`** — при включённом LLM обязателен для регистрации `POST /api/prompt/proxy`; клиент передаёт `Authorization: Bearer …` (см. раздел Prompt proxy).
 - Для prompt proxy модель по умолчанию: `LLM_PROMPT_PROXY_MODEL` или устаревшее `OPENROUTER_PROMPT_PROXY_MODEL`, иначе `OPENROUTER_MODEL` / `NVIDIA_MODEL` в зависимости от провайдера.
+- **`NVIDIA_PROXY_ENABLED=true`** — включает отдельную infra-feature NVIDIA proxy.
+- **`NVIDIA_PROXY_API_KEY`** — bearer‑секрет для инфраструктурных маршрутов NVIDIA proxy (обязательно при `NVIDIA_PROXY_ENABLED=true`; при отсутствии backend завершит старт с ошибкой конфигурации).
+- `NVIDIA_PROXY_UPSTREAM_BASE_URL` — опциональный base URL для будущего passthrough (по умолчанию `https://integrate.api.nvidia.com/v1`).
+- `NVIDIA_PROXY_REQUEST_TIMEOUT_MS` (default `120000`) и `NVIDIA_PROXY_CONNECT_TIMEOUT_MS` (default `15000`) — таймауты для будущих upstream вызовов.
+- `NVIDIA_PROXY_RATE_LIMIT_PER_MINUTE` — опциональный in-memory rate limit по IP+path для `/api/nvidia/proxy/*` (окно 60 секунд, ответ `429` + `Retry-After: 60`). Если переменная задана, но не является целым `> 0`, backend завершит старт с ошибкой конфигурации.
+- `NVIDIA_PROXY_RATE_LIMIT_TRUST_FORWARDED=true` — учитывать `X-Forwarded-For` / `X-Real-IP` для NVIDIA proxy rate-limit (включать только за доверенным reverse proxy).
 - **`LLM_RATE_LIMIT_REQUESTS_PER_MINUTE`** — если задано целое **> 0**, включается in‑memory лимит **POST** `/api/text/process` и `/api/prompt/proxy` на комбинацию IP+path (скользящее окно **60 с**). Ответ **`429`** с заголовком **`Retry-After: 60`**: для `/api/prompt/proxy` тело в формате `{"error":{...}}` (как у других ошибок proxy), для `/api/text/process` — `{"error":"..."}`. Для нескольких инстансов нужен внешний лимитер (nginx, API gateway).
 - **`LLM_RATE_LIMIT_TRUST_FORWARDED=true`** — учитывать `X-Forwarded-For` / `X-Real-IP` при расчёте IP для лимита. Включайте **только** за доверенным reverse proxy; иначе клиенты смогут подменять IP и обходить лимит.
 - **`METRICS_PROMETHEUS_ENABLED=true`** — экспорт Micrometer в формате Prometheus на **`GET /metrics/prometheus`**.
@@ -51,6 +57,30 @@ Authorization: Bearer <PROMPT_PROXY_API_KEY>
 
 - **`stream: false` или поле не передано** — ответ `200` с JSON `{"result":"..."}`.
 - **`stream: true`** — ответ `Content-Type: text/event-stream` (SSE). Строки `data:` с JSON `{"text":"<дельта>"}`; в конце при успехе — `event: done` и `data: {}`. Ошибка валидации до вызова LLM — по-прежнему **`400` + JSON** с полем `error`. Ошибка upstream при стриминге — **`event: error`** и в `data` JSON того же вида, что и для нестриминговых ошибок. Поле **`providerRaw`** может быть усечено; тогда **`providerRawTruncated`: true** (лимит длины см. `ProcessTextErrorDiagnostics` в коде).
+
+### NVIDIA proxy infra (этап 1)
+
+Фича выключена по умолчанию и включается отдельно:
+
+```powershell
+$env:NVIDIA_PROXY_ENABLED="true"
+$env:NVIDIA_PROXY_API_KEY="your-long-random-nvidia-proxy-secret"
+.\gradlew.bat :backend:run
+```
+
+Инфраструктурные маршруты:
+
+- `GET /api/nvidia/proxy/health` — проверка готовности фичи.
+- `GET /api/nvidia/proxy/capabilities` — текущие возможности/планы.
+- `POST /api/nvidia/proxy/stub` — временная заглушка (**`501 Not Implemented`**) до добавления конкретного passthrough endpoint.
+
+Для всех маршрутов обязателен заголовок:
+
+```text
+Authorization: Bearer <NVIDIA_PROXY_API_KEY>
+```
+
+Если токен неверный/отсутствует — **`401 Unauthorized`** с JSON `{"error":{"message":"Unauthorized.","code":"unauthorized"}}`. Схема `Bearer` читается без учёта регистра (`Bearer`/`bearer`).
 
 ### Тесты (`:backend:test`)
 
