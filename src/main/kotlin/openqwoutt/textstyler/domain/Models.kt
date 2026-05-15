@@ -129,3 +129,17 @@ sealed class TextStylerResult {
     data object EmptyInput : TextStylerResult()
     data object OrchestratorFailed : TextStylerResult()
 }
+
+/**
+ * Streaming result events for real-time token display.
+ */
+sealed class StreamingResult {
+    /** Streaming has started */
+    data object Started : StreamingResult()
+    /** New token received */
+    data class Token(val text: String) : StreamingResult()
+    /** All tokens received, full result available */
+    data class Done(val fullText: String) : StreamingResult()
+    /** Error occurred */
+    data class Error(val message: String) : StreamingResult()
+}

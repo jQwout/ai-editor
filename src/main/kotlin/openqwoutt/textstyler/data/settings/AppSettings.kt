@@ -53,6 +53,13 @@ enum class AiProvider(
 }
 
 @Serializable
+enum class AnimationType {
+    NONE,
+    TYPEWRITER,
+    FADE_IN
+}
+
+@Serializable
 data class AppSettings(
     val backendUrl: String = "http://10.0.2.2:8080",
     val defaultMode: String = "style",
@@ -64,7 +71,9 @@ data class AppSettings(
     val aiModel: String = "",
     val apiKey: String = "",
     val saveHistory: Boolean = true,
-    val useBackend: Boolean = false
+    val useBackend: Boolean = false,
+    val useStreaming: Boolean = true,
+    val animationType: AnimationType = AnimationType.TYPEWRITER
 ) {
     fun toAiProvider(): AiProvider = AiProvider.fromString(aiProvider)
 

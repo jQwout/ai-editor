@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,9 +79,13 @@ fun SettingsScreen(
     var hapticFeedback by remember(settings.hapticFeedback) { mutableStateOf(settings.hapticFeedback) }
     var saveHistory by remember(settings.saveHistory) { mutableStateOf(settings.saveHistory) }
     var useBackend by remember(settings.useBackend) { mutableStateOf(settings.useBackend) }
+    var useStreaming by remember(settings.useStreaming) { mutableStateOf(settings.useStreaming) }
 
     Surface(
-        modifier = Modifier.fillMaxSize().systemBarsPadding().imePadding(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(WindowInsets.navigationBars.asPaddingValues())
+            .imePadding(),
         color = AppBg
     ) {
         Column(
@@ -269,6 +275,11 @@ fun SettingsScreen(
                         checked = saveHistory,
                         onCheckedChange = { saveHistory = it }
                     )
+                    SettingsToggleRow(
+                        title = "Streaming response",
+                        checked = useStreaming,
+                        onCheckedChange = { useStreaming = it }
+                    )
                 }
             }
 
@@ -286,7 +297,8 @@ fun SettingsScreen(
                             aiModel = aiModel.trim(),
                             apiKey = apiKey.trim(),
                             saveHistory = saveHistory,
-                            useBackend = useBackend
+                            useBackend = useBackend,
+                            useStreaming = useStreaming
                         )
                     )
                 },
