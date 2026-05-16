@@ -5,3 +5,4 @@ out
 .idea
 .git
 **/.DS_Store
+.env.docker

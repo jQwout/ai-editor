@@ -13,6 +13,43 @@ $env:PROMPT_PROXY_API_KEY="your-long-random-proxy-secret"
 .\gradlew.bat :backend:run
 ```
 
+## Docker
+
+Из директории `backend/`:
+
+```powershell
+# 1) Подготовить env-файл
+Copy-Item .env.docker.example .env.docker
+
+# 2) Собрать образ
+docker build -t side-ai-editor-backend:latest .
+
+# 3) Запустить контейнер
+docker run --rm -p 8080:8080 --env-file .env.docker side-ai-editor-backend:latest
+```
+
+Или через Docker Compose:
+
+```powershell
+Copy-Item .env.docker.example .env.docker
+docker compose up --build -d
+```
+
+Если порт `8080` уже занят, переопредели порт хоста:
+
+```powershell
+$env:BACKEND_PORT="18080"
+docker compose up --build -d
+```
+
+В `docker compose` внутренний порт backend фиксирован на `8080`; меняй только внешний (host) порт через `BACKEND_PORT`.
+
+Проверка:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8080/health
+```
+
 ### NVIDIA (NIM / API catalog, OpenAI-совместимый chat)
 
 ```powershell
