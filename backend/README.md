@@ -4,13 +4,63 @@ Ktor proxy for OpenRouter. Keep the OpenRouter key here, never in the Android ap
 
 ## Run
 
-PowerShell:
+PowerShell (OpenRouter — по умолчанию, `LLM_PROVIDER` можно не задавать):
 
 ```powershell
 $env:OPENROUTER_API_KEY="sk-or-v1-..."
 $env:OPENROUTER_MODEL="openai/gpt-4o-mini"
+$env:PROMPT_PROXY_API_KEY="your-long-random-proxy-secret"
 .\gradlew.bat :backend:run
 ```
+
+### NVIDIA (NIM / API catalog, OpenAI-совместимый chat)
+
+```powershell
+$env:LLM_PROVIDER="nvidia"
+$env:NVIDIA_API_KEY="nvapi-..."
+$env:PROMPT_PROXY_API_KEY="your-long-random-proxy-secret"
+# опционально:
+# $env:NVIDIA_CHAT_COMPLETIONS_URL="https://integrate.api.nvidia.com/v1/chat/completions"
+# $env:NVIDIA_MODEL="meta/llama-3.1-8b-instruct"
+.\gradlew.bat :backend:run
+```
+
+Переменные:
+
+- `LLM_PROVIDER` — `openrouter` (по умолчанию) или `nvidia` / `nim`.
+- **`PROMPT_PROXY_API_KEY`** — при включённом LLM обязателен для регистрации `POST /api/prompt/proxy`; клиент передаёт `Authorization: Bearer …` (см. раздел Prompt proxy).
+- Для prompt proxy модель по умолчанию: `LLM_PROMPT_PROXY_MODEL` или устаревшее `OPENROUTER_PROMPT_PROXY_MODEL`, иначе `OPENROUTER_MODEL` / `NVIDIA_MODEL` в зависимости от провайдера.
+- **`LLM_RATE_LIMIT_REQUESTS_PER_MINUTE`** — если задано целое **> 0**, включается in‑memory лимит **POST** `/api/text/process` и `/api/prompt/proxy` на комбинацию IP+path (скользящее окно **60 с**). Ответ **`429`** с заголовком **`Retry-After: 60`**: для `/api/prompt/proxy` тело в формате `{"error":{...}}` (как у других ошибок proxy), для `/api/text/process` — `{"error":"..."}`. Для нескольких инстансов нужен внешний лимитер (nginx, API gateway).
+- **`LLM_RATE_LIMIT_TRUST_FORWARDED=true`** — учитывать `X-Forwarded-For` / `X-Real-IP` при расчёте IP для лимита. Включайте **только** за доверенным reverse proxy; иначе клиенты смогут подменять IP и обходить лимит.
+- **`METRICS_PROMETHEUS_ENABLED=true`** — экспорт Micrometer в формате Prometheus на **`GET /metrics/prometheus`**.
+- **`METRICS_SCRAPE_BEARER_TOKEN`** — если задан, для scrape нужен заголовок `Authorization: Bearer <token>` (сравнение constant-time). Имеет смысл вместе с firewall / private network.
+
+**CORS:** по умолчанию плагин CORS **выключен** (см. `installCorsFromEnvironment` в коде). Для браузерной админки задайте **`CORS_ALLOWED_ORIGINS`** со списком доверенных origin; не используйте **`CORS_ALLOW_ANY=true`** в публичном интернете.
+
+### Prompt proxy: `POST /api/prompt/proxy`
+
+Если LLM включён (OpenRouter/NVIDIA), для этого endpoint обязательна переменная **`PROMPT_PROXY_API_KEY`**. Без неё маршрут **не регистрируется** (в лог пишется предупреждение). Клиенты передают тот же ключ в заголовке:
+
+```text
+Authorization: Bearer <PROMPT_PROXY_API_KEY>
+```
+
+При неверном или отсутствующем заголовке — **`401 Unauthorized`** с телом `{"error":{"message":"Unauthorized.",...}}` (тот же контракт, что и для `error` в других ответах proxy).
+
+Тело JSON: `style`, `prompt`, `language`, опционально `model`, опционально **`stream`** (по умолчанию `false`).
+
+- **`stream: false` или поле не передано** — ответ `200` с JSON `{"result":"..."}`.
+- **`stream: true`** — ответ `Content-Type: text/event-stream` (SSE). Строки `data:` с JSON `{"text":"<дельта>"}`; в конце при успехе — `event: done` и `data: {}`. Ошибка валидации до вызова LLM — по-прежнему **`400` + JSON** с полем `error`. Ошибка upstream при стриминге — **`event: error`** и в `data` JSON того же вида, что и для нестриминговых ошибок. Поле **`providerRaw`** может быть усечено; тогда **`providerRawTruncated`: true** (лимит длины см. `ProcessTextErrorDiagnostics` в коде).
+
+### Тесты (`:backend:test`)
+
+Юнит‑тесты: `ChatCompletionsLlmAdapter`, `ChatCompletionsPromptProxyCompleter` (sync + mock SSE), `PromptProxyService`, `PromptProxyRoutes`, конфиги OpenRouter/NVIDIA, `ProcessTextUseCase`, `TextProcessingRoutes`, обрезка диагностик.
+
+```powershell
+.\gradlew.bat :backend:test
+```
+
+Если Gradle падает с `Could not find or load main class worker.org.gradle.process.internal.worker.GradleWorkerMain`, это сбой classpath воркера Gradle/JDK на машине (не код тестов). Имеет смысл запустить тесты из **Android Studio / IntelliJ** по модулю `backend`, либо переустановить/обновить Gradle wrapper и использовать **JDK 17** для Gradle.
 
 ## Prompt store (админская загрузка промптов в Postgres)
 
@@ -111,11 +161,15 @@ Response:
 
 `origin`/`raw` из envelope будут применены к элементам, у которых эти поля пустые.
 
+Максимум **1000** записей в `prompts` за один запрос; при превышении — **`400 Bad Request`** с полем `error` в теле JSON.
+
 Response:
 
 ```json
 { "status": "ok", "upserted": 2 }
 ```
+
+`upserted` — сколько промптов из пачки применено (вставка или обновление). Все операции выполняются в **одной транзакции**: при ошибке на любом элементе откатываются все.
 
 ### Пример вызова (PowerShell)
 
@@ -152,6 +206,12 @@ Note: if you run the backend as `gradle run` from a bind-mounted folder and in p
 Документация: `backend/docs/prompt-registry.md`.
 
 Включение: `REPO_INDEX_ENABLED=true` + Postgres env vars.
+
+HTTP‑клиент к GitHub (ингест публичных репозиториев): таймауты задаются переменными **`REPO_INDEX_HTTP_REQUEST_TIMEOUT_MS`** (по умолчанию 120000) и **`REPO_INDEX_HTTP_CONNECT_TIMEOUT_MS`** (по умолчанию 15000).
+
+Админские bulk‑операции (`/repoindex/admin/*`): не более **1000** элементов в одном запросе (списки `models`, сумма `basePrompts`+`overrides`, `prompts` в public‑prompts, `repoUrls` в ingest/upsert).
+
+Фоновый **`PUBLIC_PROMPT_AUTO_REFRESH`**: при **нескольких** инстансах backend с общей БД включайте автообновление **только на одном** процессе (иначе параллельные ingest). Распределённый lock в коде не используется.
 
 Android emulator default backend URL is:
 

@@ -19,11 +19,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import openqwoutt.textprocessor.backend.limits.ADMIN_UPSERT_MAX_ITEMS
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 
@@ -43,19 +45,25 @@ class PromptStoreRoutesTest {
             val user = System.getenv("PROMPT_DB_USER_TEST") ?: "repoindex"
             val pass = System.getenv("PROMPT_DB_PASSWORD_TEST") ?: "repoindex"
 
-            val cfg = PromptStoreConfig(
-                postgresJdbcUrl = jdbcUrl,
-                postgresUser = user,
-                postgresPassword = pass,
-                adminToken = "secret",
-            )
-            ds = PromptStoreDb.createDataSource(cfg)
-            PromptStoreDb.migrate(ds)
+            runCatching {
+                val cfg = PromptStoreConfig(
+                    postgresJdbcUrl = jdbcUrl,
+                    postgresUser = user,
+                    postgresPassword = pass,
+                    adminToken = "secret",
+                )
+                ds = PromptStoreDb.createDataSource(cfg)
+                PromptStoreDb.migrate(ds)
 
-            // Clean slate
-            ds.connection.use { c ->
-                c.createStatement().use { st ->
-                    st.executeUpdate("DELETE FROM prompt_store_prompts")
+                ds.connection.use { c ->
+                    c.createStatement().use { st ->
+                        st.executeUpdate("DELETE FROM prompt_store_prompts")
+                    }
+                }
+            }.getOrElse { err ->
+                assumeFalse(true) {
+                    "Postgres not reachable for PromptStoreRoutesTest (${jdbcUrl}): ${err.message}. " +
+                        "Start a local instance or set PROMPT_DB_JDBC_URL_TEST / PROMPT_DB_USER_TEST / PROMPT_DB_PASSWORD_TEST."
                 }
             }
         }
@@ -63,7 +71,9 @@ class PromptStoreRoutesTest {
         @AfterAll
         @JvmStatic
         fun stopPg() {
-            runCatching { ds.close() }
+            runCatching {
+                if (::ds.isInitialized) ds.close()
+            }
         }
     }
 
@@ -205,7 +215,7 @@ class PromptStoreRoutesTest {
     }
 
     @Test
-    fun `batch import merges envelope origin and counts inserted`() = appTest { _ ->
+    fun `batch import merges envelope origin and applies all in one transaction`() = appTest { _ ->
         val envelopeOrigin = buildJsonObject { put("repo", "github.com/org/repo2") }
         val envelopeRaw = buildJsonObject { put("sourceFormat", "schemaV3") }
 
@@ -226,6 +236,25 @@ class PromptStoreRoutesTest {
         assertEquals(HttpStatusCode.OK, res.status)
         val body = res.body<AdminUpsertPromptsResponse>()
         assertEquals(2, body.upserted)
+    }
+
+    @Test
+    fun `bad request when batch exceeds maximum size`() = appTest { _ ->
+        val prompts =
+            List(ADMIN_UPSERT_MAX_ITEMS + 1) { i ->
+                AdminUpsertPromptRequest(
+                    modeId = "mode_batch_$i",
+                    modelId = null,
+                    promptText = "text $i",
+                    temperature = 0.4,
+                )
+            }
+        val res = post("/admin/prompts") {
+            header(HttpHeaders.Authorization, "Bearer secret")
+            contentType(ContentType.Application.Json)
+            setBody(AdminUpsertPromptsRequest(prompts = prompts))
+        }
+        assertEquals(HttpStatusCode.BadRequest, res.status)
     }
 }
 

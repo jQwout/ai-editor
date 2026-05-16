@@ -33,5 +33,6 @@ data class AdminUpsertPromptResponse(
 @Serializable
 data class AdminUpsertPromptsResponse(
     val status: String = "ok",
+    /** Number of prompts successfully applied (insert or update); batch is one atomic transaction. */
     val upserted: Int,
 )
