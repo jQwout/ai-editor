@@ -14,6 +14,12 @@ FROM eclipse-temurin:17-jre@sha256:0d79988c68791ce864fe39d149ab1dc84f680539dca77
 WORKDIR /opt/backend
 COPY --from=build /app/build/install/backend /opt/backend
 
+# Install ca-certificates for HTTPS outbound calls and curl for HEALTHCHECK.
+# Must run as root before switching to non-root user.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Run app as non-root user inside container.
 RUN useradd --system --uid 10001 backend \
     && chown -R backend:backend /opt/backend
@@ -23,7 +29,7 @@ EXPOSE 8080
 ENV PORT=8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD ["/bin/sh", "-c", "curl --fail --silent http://127.0.0.1:${PORT:-8080}/health > /dev/null || exit 1"]
+  CMD curl --fail --silent http://127.0.0.1:8080/health > /dev/null || exit 1
 
 ENTRYPOINT ["/opt/backend/bin/backend"]
 
