@@ -1,24 +1,35 @@
-FROM gradle:8.13-jdk17 AS build
+FROM gradle:8.13-jdk17@sha256:ec973fb6579488ecba8cd24f4728cd819eda45d6b26f7f44a81682e1c034898f AS build
 
 WORKDIR /app
 
-# Copy only backend standalone build first (better Docker cache)
+# Standalone backend Gradle project files.
 COPY settings.gradle.kts build.gradle.kts /app/
 COPY src /app/src
 
-# Build a runnable distribution
+# Build runnable distribution with launch scripts in build/install/backend.
 RUN gradle --no-daemon clean installDist
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:17-jre@sha256:0d79988c68791ce864fe39d149ab1dc84f680539dca77ee7f6f3b041ad7f2f43
 
-WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=build /app/build/install/backend /app
+WORKDIR /opt/backend
+COPY --from=build /app/build/install/backend /opt/backend
+
+# Install ca-certificates for HTTPS outbound calls and curl for HEALTHCHECK.
+# Must run as root before switching to non-root user.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Run app as non-root user inside container.
+RUN useradd --system --uid 10001 backend \
+    && chown -R backend:backend /opt/backend
+USER backend
 
 EXPOSE 8080
-
-# Ktor uses PORT env
 ENV PORT=8080
 
-CMD ["/app/bin/backend"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl --fail --silent http://127.0.0.1:8080/health > /dev/null || exit 1
+
+ENTRYPOINT ["/opt/backend/bin/backend"]
 
