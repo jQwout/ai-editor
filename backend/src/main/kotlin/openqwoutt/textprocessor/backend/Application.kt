@@ -70,6 +70,8 @@ fun Application.module() {
     }
 
     routing {
+        modelsRoutes()
+        
         get("/health") {
             call.respond(mapOf("status" to "ok"))
         }

@@ -47,9 +47,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +63,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.CircularProgressIndicator
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import openqwoutt.textstyler.data.settings.AppSettings
+import openqwoutt.textstyler.network.BackendModelInfo
 
 // ============================================================================
 // Color System - Light Theme
@@ -108,24 +114,36 @@ data class SettingsState(
     val autoCopyResult: Boolean = true,
     val soundEffects: Boolean = false,
     val hapticFeedback: Boolean = true,
-    val useStreaming: Boolean = true
+    val useStreaming: Boolean = true,
+    // Models fetch state
+    val models: List<BackendModelInfo> = NvidiaModels.models,
+    val modelsLoading: Boolean = false,
+    val modelsSource: ModelSource = ModelSource.FALLBACK
 )
 
+enum class ModelSource {
+    FALLBACK, BACKEND
+}
+
 // ============================================================================
-// Hardcoded NVIDIA NIM Models
+// Hardcoded NVIDIA NIM Models (Fallback)
 // ============================================================================
 object NvidiaModels {
     val models = listOf(
-        "meta/llama-3.1-70b-instruct",
-        "qwen/qwen3-coder-480b-a35b-instruct"
+        BackendModelInfo(
+            id = "meta/llama-3.1-70b-instruct",
+            displayName = "Llama 3.1 70B Instruct",
+            provider = "nvidia"
+        ),
+        BackendModelInfo(
+            id = "qwen/qwen3-coder-480b-a35b-instruct",
+            displayName = "Qwen3 Coder 480B",
+            provider = "nvidia"
+        )
     )
-    
-    val displayNames = mapOf(
-        "meta/llama-3.1-70b-instruct" to "Llama 3.1 70B Instruct",
-        "qwen/qwen3-coder-480b-a35b-instruct" to "Qwen3 Coder 480B"
-    )
-    
-    fun getDisplayName(modelId: String): String = displayNames[modelId] ?: modelId
+
+    fun getDisplayName(modelId: String): String = 
+        models.find { it.id == modelId }?.displayName ?: modelId
 }
 
 // ============================================================================
@@ -198,11 +216,27 @@ fun SettingsScreen(
     
     var showAiModelScreen by remember { mutableStateOf(false) }
     var showLanguageScreen by remember { mutableStateOf(false) }
-    
+
+    // Fetch models from backend when AI Model screen opens
+    LaunchedEffect(showAiModelScreen, state.customBackendUrl) {
+        if (showAiModelScreen && state.customBackendEnabled && state.customBackendUrl.isNotBlank()) {
+            state = state.copy(modelsLoading = true)
+            // TODO: Call backend to fetch models
+            // For now, keep fallback models
+            state = state.copy(
+                modelsLoading = false,
+                modelsSource = ModelSource.FALLBACK
+            )
+        }
+    }
+
     if (showAiModelScreen) {
         AiModelSelectionScreen(
             selectedModel = state.aiModel,
             apiKey = state.apiKey,
+            models = state.models,
+            isLoadingModels = state.modelsLoading,
+            modelsSource = state.modelsSource,
             onModelSelected = { model, key ->
                 state = state.copy(aiModel = model, apiKey = key)
             },
@@ -723,6 +757,9 @@ private fun CustomBackendCard(
 fun AiModelSelectionScreen(
     selectedModel: String,
     apiKey: String,
+    models: List<BackendModelInfo>,
+    isLoadingModels: Boolean,
+    modelsSource: ModelSource,
     onModelSelected: (model: String, apiKey: String) -> Unit,
     onBack: () -> Unit,
     isDarkTheme: Boolean = false
@@ -875,14 +912,51 @@ fun AiModelSelectionScreen(
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
-                    Text(
-                        text = "Select Model",
-                        color = textPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Select Model",
+                            color = textPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        // Source indicator
+                        if (isLoadingModels) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Loading...",
+                                color = textSecondary,
+                                fontSize = 12.sp
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(
+                                        if (modelsSource == ModelSource.BACKEND) Color(0xFF10B981).copy(alpha = 0.2f)
+                                        else activeBadge
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = if (modelsSource == ModelSource.BACKEND) "SERVER" else "DEFAULT",
+                                    color = if (modelsSource == ModelSource.BACKEND) Color(0xFF10B981) else primary,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
-                    
+
                     // Dropdown
                     Box {
                         Surface(
@@ -890,7 +964,12 @@ fun AiModelSelectionScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
-                                .clickable { expanded = true },
+                                .then(
+                                    if (!isLoadingModels)
+                                        Modifier.clickable { expanded = true }
+                                    else
+                                        Modifier
+                                ),
                             color = cardBg,
                             shape = RoundedCornerShape(12.dp)
                         ) {
@@ -901,27 +980,35 @@ fun AiModelSelectionScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = NvidiaModels.getDisplayName(currentModel),
+                                    text = models.find { it.id == currentModel }?.displayName
+                                        ?: NvidiaModels.getDisplayName(currentModel),
                                     color = if (currentModel.isNotEmpty()) primary else textSecondary,
                                     fontSize = 14.sp,
                                     modifier = Modifier.weight(1f)
                                 )
-                                Icon(
-                                    imageVector = if (expanded) Icons.Default.KeyboardArrowRight else Icons.Default.KeyboardArrowRight,
-                                    contentDescription = null,
-                                    tint = textSecondary,
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                )
+                                if (isLoadingModels) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = primary
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowRight,
+                                        contentDescription = null,
+                                        tint = textSecondary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             }
                         }
-                        
+
                         androidx.compose.material3.DropdownMenu(
                             expanded = expanded,
                             onDismissRequest = { expanded = false },
                             modifier = Modifier.background(cardBg)
                         ) {
-                            NvidiaModels.models.forEach { model ->
+                            models.forEach { model ->
                                 androidx.compose.material3.DropdownMenuItem(
                                     text = {
                                         Row(
@@ -929,11 +1016,11 @@ fun AiModelSelectionScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = NvidiaModels.getDisplayName(model),
+                                                text = model.displayName,
                                                 color = textPrimary,
                                                 modifier = Modifier.weight(1f)
                                             )
-                                            if (model == currentModel) {
+                                            if (model.id == currentModel) {
                                                 Icon(
                                                     imageVector = Icons.Default.Check,
                                                     contentDescription = "Selected",
@@ -943,7 +1030,7 @@ fun AiModelSelectionScreen(
                                         }
                                     },
                                     onClick = {
-                                        currentModel = model
+                                        currentModel = model.id
                                         expanded = false
                                     }
                                 )

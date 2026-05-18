@@ -15,6 +15,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.request.get
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
@@ -191,6 +192,26 @@ class AiApiClient {
         return response.body()
     }
 
+    /**
+     * Fetch available models from backend.
+     * Returns null if backend is unreachable (timeout or error).
+     */
+    suspend fun fetchModelsFromBackend(backendUrl: String): List<BackendModelInfo>? {
+        return try {
+            val response = client.get("$backendUrl/api/models") {
+                accept(ContentType.Application.Json)
+            }
+            if (response.status.value == 200) {
+                response.body<BackendModelsResponse>().models
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch models from backend: ${e.message}")
+            null
+        }
+    }
+
     private suspend fun ensureSuccess(statusCode: Int, source: String, bodyProvider: suspend () -> String) {
         if (statusCode in 200..299) return
 
@@ -264,4 +285,16 @@ data class BackendRequest(
 @Serializable
 data class BackendResponse(
     val result: String
+)
+
+@Serializable
+data class BackendModelsResponse(
+    val models: List<BackendModelInfo>
+)
+
+@Serializable
+data class BackendModelInfo(
+    val id: String,
+    val displayName: String,
+    val provider: String
 )
